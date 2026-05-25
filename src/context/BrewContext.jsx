@@ -60,6 +60,7 @@ export function BrewProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useBrew() {
   return useContext(BrewContext)
 }

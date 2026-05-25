@@ -1,6 +1,19 @@
 const CACHE_NAME = 'brew-log-v1'
 
-self.addEventListener('install', () => self.skipWaiting())
+const SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/apple-touch-icon.png',
+]
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(c => c.addAll(SHELL))
+  )
+  self.skipWaiting()
+})
 
 self.addEventListener('activate', e => {
   e.waitUntil(
