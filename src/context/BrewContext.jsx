@@ -34,7 +34,7 @@ export function BrewProvider({ children }) {
     }
   }, [entries])
 
-  function addEntry({ type, name, photo, rating, notes }) {
+  function addEntry({ type, name, photo, rating, notes, color }) {
     dispatch({
       type: 'ADD',
       entry: {
@@ -45,6 +45,7 @@ export function BrewProvider({ children }) {
         ...(photo != null && { photo }),
         ...(rating != null && { rating }),
         ...(notes != null && { notes }),
+        ...(color != null && { color }),
       },
     })
   }
