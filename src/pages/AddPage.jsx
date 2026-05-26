@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import StarRating from '../components/StarRating'
 import PhotoPicker from '../components/PhotoPicker'
+import ColorPicker from '../components/ColorPicker'
 
 export default function AddPage() {
   const navigate = useNavigate()
@@ -14,6 +15,7 @@ export default function AddPage() {
   const [photo, setPhoto] = useState(null)
   const [rating, setRating] = useState(0)
   const [notes, setNotes] = useState('')
+  const [color, setColor] = useState('#c97b3a')
 
   function handleSave() {
     if (!name.trim()) return
@@ -23,6 +25,7 @@ export default function AddPage() {
       ...(photo && { photo }),
       ...(rating > 0 && { rating }),
       ...(notes.trim() && { notes: notes.trim() }),
+      color,
     })
     navigate('/')
   }
@@ -85,6 +88,11 @@ export default function AddPage() {
           <div>
             <label className="sheet__label">Photo (optional)</label>
             <PhotoPicker value={photo} onChange={setPhoto} />
+            <ColorPicker
+              photoDataUrl={photo}
+              color={color}
+              onChange={setColor}
+            />
           </div>
 
           {/* Rating */}
