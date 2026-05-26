@@ -2,10 +2,19 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import EntryCard from '../components/EntryCard'
+import DailyCup from '../components/DailyCup'
+import { calcPhotoStreak } from '../utils/streakCalc'
 
 export default function FeedPage() {
   const { entries } = useBrew()
   const navigate = useNavigate()
+
+  const todayStr = new Date().toDateString()
+  const todayEntries = [...entries]
+    .filter(e => new Date(e.timestamp).toDateString() === todayStr)
+    .sort((a, b) => a.timestamp - b.timestamp)
+
+  const streak = calcPhotoStreak(entries)
 
   return (
     <motion.div
@@ -16,6 +25,8 @@ export default function FeedPage() {
     >
       <h1 className="feed-page__heading">my brew log</h1>
 
+      <DailyCup todayEntries={todayEntries} streak={streak} />
+
       {entries.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state__icon">☕</div>
@@ -23,7 +34,7 @@ export default function FeedPage() {
           <p className="empty-state__sub">Your future self will thank you for starting.</p>
         </div>
       ) : (
-        <div className="feed-page__list">
+        <div className="feed-page__list" style={{ borderTop: '1px solid var(--border)' }}>
           {entries.map((entry, i) => (
             <EntryCard key={entry.id} entry={entry} index={i} />
           ))}
