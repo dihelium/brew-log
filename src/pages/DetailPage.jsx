@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import StarRating from '../components/StarRating'
 
@@ -13,108 +15,116 @@ export default function DetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { entries, deleteEntry } = useBrew()
+  const [confirming, setConfirming] = useState(false)
 
   const entry = entries.find(e => e.id === id)
 
   if (!entry) {
     return (
-      <div style={{ padding: 32, textAlign: 'center', color: '#9b8475' }}>
-        <div style={{ marginBottom: 12 }}>Entry not found.</div>
-        <button
-          onClick={() => navigate('/')}
-          style={{ background: 'none', border: 'none', color: '#9b6b3a', fontSize: 15, cursor: 'pointer' }}
-        >
-          ← Go back
-        </button>
-      </div>
+      <motion.div
+        className="feed-page"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+          <div style={{ marginBottom: 12 }}>Entry not found.</div>
+          <button
+            onClick={() => navigate('/')}
+            style={{ background: 'none', border: 'none', color: 'var(--accent-coffee)', fontSize: 15, cursor: 'pointer' }}
+          >
+            ← Go back
+          </button>
+        </div>
+      </motion.div>
     )
   }
 
   function handleDelete() {
-    if (window.confirm('Delete this entry? This cannot be undone.')) {
-      deleteEntry(id)
-      navigate('/')
-    }
+    deleteEntry(id)
+    navigate('/')
   }
 
   const isMatcha = entry.type === 'matcha'
-  const heroBg = isMatcha
-    ? 'linear-gradient(135deg, #8bba8b, #4a7c59)'
-    : 'linear-gradient(135deg, #c8b4a0, #8b6f5a)'
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#faf7f2' }}>
-      {/* Nav bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        padding: '14px 16px 12px',
-        borderBottom: '1px solid #e8e0d4',
-        background: '#faf7f2',
-        position: 'sticky', top: 0, zIndex: 10,
-      }}>
-        <button
-          onClick={() => navigate('/')}
-          style={{ background: 'none', border: 'none', color: '#9b6b3a', fontSize: 15, cursor: 'pointer', padding: 0 }}
-        >
-          ← Feed
-        </button>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={handleDelete}
-          style={{ background: 'none', border: 'none', color: '#cc4444', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 0 }}
-        >
-          Delete
-        </button>
-      </div>
-
-      {/* Photo hero */}
-      <div style={{
-        width: '100%', height: 220,
-        background: entry.photo ? 'transparent' : heroBg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden',
-      }}>
+    <motion.div
+      className="detail-page"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+    >
+      {/* Hero */}
+      <div
+        className="detail-hero"
+        style={{ background: entry.photo ? 'transparent' : (isMatcha ? 'var(--accent-matcha)' : 'var(--accent-coffee)') }}
+      >
         {entry.photo
-          ? <img src={entry.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <span style={{ fontSize: 72 }}>{isMatcha ? '🍵' : '☕'}</span>
+          ? <img src={entry.photo} alt="" />
+          : null
         }
+        <div className="detail-hero__scrim" />
+        <div className="detail-hero__text">
+          <h1 className="detail-hero__name">{entry.name}</h1>
+          <span className="entry-card__badge" data-type={entry.type}>
+            {entry.type === 'coffee' ? 'Coffee' : 'Matcha'}
+          </span>
+        </div>
+        <button
+          className="detail-hero__back"
+          onClick={() => navigate('/')}
+          aria-label="Go back"
+        >
+          ←
+        </button>
       </div>
 
-      {/* Content */}
-      <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Type badge + name + date */}
-        <div>
-          <span style={{
-            display: 'inline-block', fontSize: 11, fontWeight: 600,
-            padding: '3px 10px', borderRadius: 20, marginBottom: 10,
-            background: isMatcha ? '#e8f0e4' : '#f0e8e0',
-            color: isMatcha ? '#4a7c59' : '#9b6b3a',
-          }}>
-            {entry.type}
-          </span>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#3d2b1f', lineHeight: 1.2 }}>
-            {entry.name}
-          </div>
-          <div style={{ fontSize: 13, color: '#9b8475', marginTop: 5 }}>
-            {formatDate(entry.timestamp)}
-          </div>
+      {/* Body */}
+      <div className="detail-body">
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+          {formatDate(entry.timestamp)}
         </div>
 
-        {/* Rating */}
-        {entry.rating > 0 && <StarRating value={entry.rating} />}
+        {entry.rating > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <StarRating value={entry.rating} readOnly />
+          </div>
+        )}
 
-        {/* Notes */}
         {entry.notes && (
-          <div style={{
-            padding: '14px 16px',
-            background: '#fff', borderRadius: 12,
-            border: '1px solid #e8e0d4',
-            fontSize: 15, color: '#5a4535', lineHeight: 1.65,
-          }}>
+          <div className="detail-notes">
             {entry.notes}
           </div>
         )}
+
+        {/* Delete */}
+        {!confirming ? (
+          <button
+            className="detail-delete-btn"
+            onClick={() => setConfirming(true)}
+          >
+            Delete brew
+          </button>
+        ) : (
+          <div className="detail-confirm">
+            <p className="detail-confirm__text">Gone forever. (We won't judge.)</p>
+            <div className="detail-confirm__actions">
+              <button
+                className="detail-confirm__yes"
+                onClick={handleDelete}
+              >
+                Yes, delete
+              </button>
+              <button
+                className="detail-confirm__no"
+                onClick={() => setConfirming(false)}
+              >
+                Keep it
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </motion.div>
   )
 }
