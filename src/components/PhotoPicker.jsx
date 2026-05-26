@@ -26,7 +26,7 @@ export default function PhotoPicker({ value, onChange }) {
             width: '100%',
             height: 180,
             objectFit: 'cover',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-sm)',
             display: 'block',
           }}
         />
@@ -53,8 +53,8 @@ export default function PhotoPicker({ value, onChange }) {
         onClick={() => inputRef.current.click()}
         style={{
           width: '100%', padding: 16,
-          border: '2px dashed #e8e0d4', borderRadius: 12,
-          background: 'transparent', color: '#9b8475',
+          border: '2px dashed var(--border)', borderRadius: 'var(--radius-sm)',
+          background: 'var(--surface)', color: 'var(--text-muted)',
           fontSize: 15, cursor: 'pointer',
           display: 'block',
         }}

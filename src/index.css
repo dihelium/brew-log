@@ -196,3 +196,103 @@ button, input, textarea {
   font-size: 14px;
   color: var(--text-muted);
 }
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(61,43,31,0.3);
+  z-index: 100;
+}
+
+.sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface-raised);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 12px 20px 48px;
+  z-index: 101;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.sheet__handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+.sheet__heading {
+  font-family: var(--font-display);
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.sheet__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.sheet__input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 16px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.sheet__textarea {
+  resize: none;
+}
+
+.sheet__type-btn {
+  flex: 1;
+  padding: 11px 0;
+  border-radius: 24px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: var(--font-body);
+}
+
+.sheet__type-btn[data-active="true"] {
+  border-color: var(--accent-coffee);
+  background: var(--accent-coffee);
+  color: #fff;
+}
+
+.sheet__save-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent-coffee);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 20px;
+  font-family: var(--font-body);
+}
+
+.sheet__save-btn:disabled {
+  background: var(--border-strong);
+  cursor: not-allowed;
+}
