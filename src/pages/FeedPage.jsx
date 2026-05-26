@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import EntryCard from '../components/EntryCard'
 
@@ -7,58 +8,36 @@ export default function FeedPage() {
   const navigate = useNavigate()
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#faf7f2', paddingBottom: 80 }}>
-      {/* Header */}
-      <div style={{
-        padding: '16px 16px 12px',
-        borderBottom: '1px solid #e8e0d4',
-        background: '#faf7f2',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#3d2b1f', letterSpacing: '-0.3px' }}>
-          my brew log
-        </div>
-        <div style={{ fontSize: 12, color: '#9b8475', marginTop: 2 }}>
-          {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
-        </div>
-      </div>
+    <motion.div
+      className="feed-page"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <h1 className="feed-page__heading">my brew log</h1>
 
-      {/* Empty state */}
       {entries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '72px 24px', color: '#9b8475' }}>
-          <div style={{ fontSize: 48, marginBottom: 14 }}>☕</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: '#3d2b1f', marginBottom: 6 }}>
-            No brews yet
-          </div>
-          <div style={{ fontSize: 14 }}>Tap + to log your first drink</div>
+        <div className="empty-state">
+          <div className="empty-state__icon">☕</div>
+          <p className="empty-state__heading">No brews yet.</p>
+          <p className="empty-state__sub">Your future self will thank you for starting.</p>
         </div>
       ) : (
-        <div>
-          {entries.map(entry => (
-            <EntryCard key={entry.id} entry={entry} />
+        <div className="feed-page__list">
+          {entries.map((entry, i) => (
+            <EntryCard key={entry.id} entry={entry} index={i} />
           ))}
         </div>
       )}
 
-      {/* FAB */}
-      <button
+      <motion.button
+        className="feed-page__fab"
+        whileTap={{ scale: 0.93 }}
         onClick={() => navigate('/add')}
-        style={{
-          position: 'fixed', bottom: 28, right: 24,
-          width: 56, height: 56, borderRadius: '50%',
-          background: '#3d2b1f', color: '#fff',
-          border: 'none', fontSize: 30, cursor: 'pointer',
-          boxShadow: '0 4px 20px rgba(61,43,31,0.35)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          lineHeight: 1,
-          WebkitTapHighlightColor: 'transparent',
-        }}
         aria-label="Log a drink"
       >
         +
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   )
 }
