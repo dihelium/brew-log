@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import StarRating from './StarRating'
 
 function formatTime(ts) {
   const d = new Date(ts)
@@ -11,57 +13,33 @@ function formatTime(ts) {
   return `${day}, ${time}`
 }
 
-export default function EntryCard({ entry }) {
+export default function EntryCard({ entry, index = 0 }) {
   const navigate = useNavigate()
 
-  const stripBg = entry.type === 'matcha' ? '#d4e8d4' : '#e8ddd4'
-  const emoji = entry.type === 'matcha' ? '🍵' : '☕'
-
   return (
-    <div
+    <motion.div
+      className="entry-card"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, delay: index * 0.04, ease: [0.4, 0, 0.2, 1] }}
       onClick={() => navigate(`/entry/${entry.id}`)}
-      style={{
-        display: 'flex',
-        alignItems: 'stretch',
-        borderBottom: '1px solid #e8e0d4',
-        background: '#fff',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-      }}
     >
-      {/* Photo strip */}
-      <div
-        style={{
-          width: 64,
-          minHeight: 72,
-          flexShrink: 0,
-          background: entry.photo ? 'transparent' : stripBg,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="entry-card__photo">
         {entry.photo
-          ? <img src={entry.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <span style={{ fontSize: 24 }}>{emoji}</span>
+          ? <img src={entry.photo} alt="" />
+          : <div className="entry-card__photo-placeholder" data-type={entry.type} />
         }
       </div>
-
-      {/* Text body */}
-      <div style={{ padding: '10px 14px', flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#3d2b1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {entry.name}
+      <div className="entry-card__body">
+        <p className="entry-card__name">{entry.name}</p>
+        <div className="entry-card__meta">
+          <span className="entry-card__badge" data-type={entry.type}>
+            {entry.type === 'coffee' ? 'Coffee' : 'Matcha'}
+          </span>
+          <span className="entry-card__time">{formatTime(entry.timestamp)}</span>
         </div>
-        <div style={{ fontSize: 11, color: '#9b8475', marginTop: 2 }}>
-          {entry.type} · {formatTime(entry.timestamp)}
-        </div>
-        {entry.rating > 0 && (
-          <div style={{ fontSize: 11, color: '#c97b3a', marginTop: 4 }}>
-            {'★'.repeat(entry.rating)}{'☆'.repeat(5 - entry.rating)}
-          </div>
-        )}
+        {entry.rating && <StarRating value={entry.rating} readOnly />}
       </div>
-    </div>
+    </motion.div>
   )
 }
