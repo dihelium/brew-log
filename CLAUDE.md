@@ -1,335 +1,738 @@
-# my brew log — redesign spec
+# my brew log — feature spec: layered cup + photo streak + colour picker
 
-> This file is the single source of truth for the redesign. Read it fully before touching any file.
-> Work through tasks in order. Check off each step as you complete it. Commit after every task.
-
----
-
-## Stack (do not change)
-React 18 · Vite · React Router v6 · localStorage · vanilla CSS · service worker
-Add ONE new dependency: `framer-motion` (for animations)
-
-```bash
-npm install framer-motion
-```
+> **Read this fully before touching any file.**
+> This spec builds on top of the existing redesign (DM fonts, Framer Motion, bottom sheet).
+> That redesign must be complete before starting these tasks.
+> Work through tasks in order. Commit after every task.
 
 ---
 
-## Design tokens — replace ALL existing CSS variables with these
+## What we are building
 
-```css
-:root {
-  --bg: #faf7f2;
-  --surface: #f0ead9;
-  --surface-raised: #ffffff;
-  --border: #e2d5be;
-  --border-strong: #c8b89a;
-  --text-primary: #3d2b1f;
-  --text-secondary: #7a6355;
-  --text-muted: #b09880;
-  --accent-coffee: #c97b3a;
-  --accent-coffee-dark: #a05e28;
-  --accent-matcha: #4a7c59;
-  --accent-matcha-dark: #365c42;
-  --danger: #c0392b;
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --shadow-card: 0 1px 3px rgba(61,43,31,0.06), 0 4px 12px rgba(61,43,31,0.04);
-}
-```
+Three linked features:
+
+1. **Layered daily cup** — a cup SVG sits at the top of FeedPage showing today's coffees as stacked colour bands. One coffee = full cup in that coffee's colour. Two coffees = the first coffee fills the bottom half, the second sits on top. Three = three equal bands. The cup is always shown; it appears as an empty outline until today's first log.
+
+2. **Colour picker** — when a photo is added in AddPage, the dominant colour is auto-extracted from the centre of the image using Canvas. This becomes the entry's `color` field. The user can override by tapping "Pick from photo", which activates an eyedropper mode: touching anywhere on the photo image shows a circular magnifier with the sampled colour; releasing locks it in. Identical UX to the Instagram Stories colour dropper.
+
+3. **Photo streak** — counts consecutive "coffee days" (calendar days that have at least one entry) where every entry for that day has a photo. Days with no entries are transparent and do not break the streak. The streak breaks the moment any coffee day has an entry without a photo. A single chip on FeedPage shows the count.
 
 ---
 
-## Typography — install via Google Fonts link in index.html
+## New files to create
 
-Add this inside `<head>` in index.html, after the existing meta tags:
-
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
-```
-
-Then in index.css:
-```css
-:root {
-  --font-display: 'DM Serif Display', Georgia, serif;
-  --font-body: 'DM Sans', -apple-system, sans-serif;
-}
-
-body {
-  font-family: var(--font-body);
-}
-```
-
----
-
-## Motion spec — use Framer Motion for all animations
-
-All transitions use `ease: [0.4, 0, 0.2, 1]` unless specified otherwise.
-
-| Element | Animation |
+| File | Purpose |
 |---|---|
-| Page enter | `initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25 }}` |
-| Card list | Stagger: each card `delay: index * 0.04`, same enter as above |
-| Bottom sheet | `initial={{ y:'100%' }} animate={{ y:0 }} transition={{ duration:0.3 }}` |
-| Backdrop | `initial={{ opacity:0 }} animate={{ opacity:1 }}` |
-| FAB | `whileTap={{ scale:0.93 }}` |
-| Star (on tap) | `whileTap={{ scale:1.3 }}` per star |
+| `src/utils/extractColor.js` | Canvas-based dominant colour + point-sample functions |
+| `src/utils/streakCalc.js` | Photo streak calculation from entries array |
+| `src/components/DailyCup.jsx` | Layered cup SVG + today's label + streak chip |
+| `src/components/ColorPicker.jsx` | Auto-extract + eyedropper UI rendered below photo in AddPage |
 
----
+## Existing files to modify
 
-## Voice / microcopy — replace all existing UI strings with these
-
-| Location | New copy |
+| File | Change |
 |---|---|
-| Empty feed heading | `No brews yet.` |
-| Empty feed subtext | `Your future self will thank you for starting.` |
-| Add page heading | `What did you make today?` |
-| Coffee type label | `Coffee` |
-| Matcha type label | `Matcha` |
-| Name field placeholder | `e.g. oat flat white, ceremonial matcha` |
-| Notes placeholder | `Tasting notes, how you brewed it, anything…` |
-| Save button | `Log it` |
-| After save (toast or return) | `Logged. ☕` |
-| Delete button | `Delete brew` |
-| Delete confirm message | `Gone forever. (We won't judge.)` |
-| Delete confirm button | `Yes, delete` |
-| Cancel | `Keep it` |
+| `src/context/BrewContext.jsx` | Add `color` field to entry schema in `addEntry` |
+| `src/pages/AddPage.jsx` | Import `ColorPicker`, add `color` state, pass to `addEntry` |
+| `src/pages/FeedPage.jsx` | Import `DailyCup`, render it between header and entry list |
 
 ---
 
-## File-by-file tasks
+## Task 1 — `src/utils/extractColor.js`
 
-### Task 1 — index.html + index.css
-- [ ] Add Google Fonts link to index.html
-- [ ] Replace all CSS variables in index.css with the new design tokens above
-- [ ] Add `--font-display` and `--font-body` variables
-- [ ] Set `font-family: var(--font-body)` on body
-- [ ] Set `background: var(--bg)` on html, body
-- [ ] Commit: `style: update design tokens and load DM fonts`
+Create this file in full:
 
----
-
-### Task 2 — EntryCard.jsx
-
-Redesign the card that appears in the feed list. Target look: warm parchment card, photo strip on the left (72px wide, full card height, object-fit cover), name in display font on the right, time + type badge below name, stars below that.
-
-```jsx
-// Structure to aim for:
-<motion.div
-  className="entry-card"
-  initial={{ opacity:0, y:10 }}
-  animate={{ opacity:1, y:0 }}
-  transition={{ duration:0.22, delay: index * 0.04, ease:[0.4,0,0.2,1] }}
-  onClick={() => navigate(`/entry/${entry.id}`)}
->
-  <div className="entry-card__photo">
-    {entry.photo
-      ? <img src={entry.photo} alt="" />
-      : <div className="entry-card__photo-placeholder" data-type={entry.type} />
+```js
+/**
+ * extractDominantColor
+ * Samples the centre 50% of an image (where the drink usually is),
+ * averages non-near-black / non-near-white pixels, returns a hex string.
+ * Falls back to '#c97b3a' (coffee brown) if sampling fails.
+ */
+export function extractDominantColor(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const SIZE = 60
+        const canvas = document.createElement('canvas')
+        canvas.width = SIZE
+        canvas.height = SIZE
+        const ctx = canvas.getContext('2d')
+        // Draw only the centre 50% of the image
+        const sx = img.width * 0.25
+        const sy = img.height * 0.25
+        const sw = img.width * 0.5
+        const sh = img.height * 0.5
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, SIZE, SIZE)
+        const data = ctx.getImageData(0, 0, SIZE, SIZE).data
+        let r = 0, g = 0, b = 0, count = 0
+        for (let i = 0; i < data.length; i += 4) {
+          const pr = data[i], pg = data[i + 1], pb = data[i + 2]
+          const brightness = (pr + pg + pb) / 3
+          // Skip near-black (<40) and near-white (>210)
+          if (brightness >= 40 && brightness <= 210) {
+            r += pr; g += pg; b += pb; count++
+          }
+        }
+        if (count === 0) { resolve('#c97b3a'); return }
+        resolve(toHex(Math.round(r / count), Math.round(g / count), Math.round(b / count)))
+      } catch {
+        resolve('#c97b3a')
+      }
     }
-  </div>
-  <div className="entry-card__body">
-    <p className="entry-card__name">{entry.name}</p>
-    <div className="entry-card__meta">
-      <span className="entry-card__badge" data-type={entry.type}>
-        {entry.type === 'coffee' ? 'Coffee' : 'Matcha'}
-      </span>
-      <span className="entry-card__time">{formatTime(entry.timestamp)}</span>
+    img.onerror = () => resolve('#c97b3a')
+    img.src = dataUrl
+  })
+}
+
+/**
+ * buildPickerCanvas
+ * Draws a dataUrl image onto an offscreen canvas and returns { canvas, ctx }.
+ * Call once when eyedropper mode starts; then use sampleCanvasAt for each move.
+ */
+export function buildPickerCanvas(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+      resolve({ canvas, ctx })
+    }
+    img.onerror = () => resolve(null)
+    img.src = dataUrl
+  })
+}
+
+/**
+ * sampleCanvasAt
+ * Synchronously samples a pixel from a pre-built canvas.
+ * imgEl: the <img> DOM element shown to the user (for bounding rect math).
+ * clientX/clientY: pointer position.
+ * Returns a hex colour string.
+ */
+export function sampleCanvasAt(ctx, canvas, imgEl, clientX, clientY) {
+  try {
+    const rect = imgEl.getBoundingClientRect()
+    const relX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const relY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
+    const x = Math.floor(relX * (canvas.width - 1))
+    const y = Math.floor(relY * (canvas.height - 1))
+    const [r, g, b] = ctx.getImageData(x, y, 1, 1).data
+    return toHex(r, g, b)
+  } catch {
+    return '#c97b3a'
+  }
+}
+
+function toHex(r, g, b) {
+  return '#' +
+    r.toString(16).padStart(2, '0') +
+    g.toString(16).padStart(2, '0') +
+    b.toString(16).padStart(2, '0')
+}
+```
+
+- [ ] Create `src/utils/extractColor.js` with the code above
+- [ ] Commit: `feat: add canvas colour extraction and eyedropper utilities`
+
+---
+
+## Task 2 — `src/utils/streakCalc.js`
+
+```js
+/**
+ * calcPhotoStreak
+ * Returns the number of consecutive "coffee days" (going back from today)
+ * where every entry for that day has a photo.
+ *
+ * Rules:
+ * - A day with no entries is transparent — does not break or increment the streak.
+ * - A day with entries where ALL have photos → streak++, continue.
+ * - A day with entries where ANY lacks a photo → streak broken, stop.
+ */
+export function calcPhotoStreak(entries) {
+  if (!entries || entries.length === 0) return 0
+
+  // Group entries by calendar date string (e.g. "Mon May 27 2026")
+  const byDate = {}
+  for (const e of entries) {
+    const key = new Date(e.timestamp).toDateString()
+    if (!byDate[key]) byDate[key] = []
+    byDate[key].push(e)
+  }
+
+  let streak = 0
+  const cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+
+  for (let i = 0; i < 366; i++) {
+    const key = cursor.toDateString()
+    const dayEntries = byDate[key]
+
+    if (!dayEntries) {
+      // No coffee this day — transparent
+      cursor.setDate(cursor.getDate() - 1)
+      continue
+    }
+
+    const allPhotographed = dayEntries.every(e => !!e.photo)
+    if (allPhotographed) {
+      streak++
+      cursor.setDate(cursor.getDate() - 1)
+    } else {
+      break // coffee day with unlogged photo — streak ends
+    }
+  }
+
+  return streak
+}
+```
+
+- [ ] Create `src/utils/streakCalc.js` with the code above
+- [ ] Commit: `feat: add photo streak calculator`
+
+---
+
+## Task 3 — `src/components/DailyCup.jsx`
+
+This component renders on FeedPage. It receives `todayEntries` (array of today's entries in chronological order, oldest first) and `streak` (number from `calcPhotoStreak`).
+
+The cup SVG uses a `<clipPath>` to clip a filled rect to the cup interior. The fill is a CSS `linear-gradient` applied via `style` on a `<foreignObject>` div — this works in modern Safari/Chrome. The gradient direction is bottom-to-top so the first (oldest) coffee sits at the bottom.
+
+When `todayEntries` is empty, the cup renders as an outline only (ghost state). When filled, a gentle steam CSS animation plays above the rim.
+
+```jsx
+import { motion } from 'framer-motion'
+
+const FALLBACK = '#c97b3a'
+
+function buildGradient(entries) {
+  if (entries.length === 0) return null
+  if (entries.length === 1) return entries[0].color || FALLBACK
+  const n = entries.length
+  const stops = entries.map((e, i) => {
+    const color = e.color || FALLBACK
+    const from = Math.round((i / n) * 100)
+    const to = Math.round(((i + 1) / n) * 100)
+    return `${color} ${from}% ${to}%`
+  })
+  return `linear-gradient(to top, ${stops.join(', ')})`
+}
+
+export default function DailyCup({ todayEntries = [], streak = 0 }) {
+  const filled = todayEntries.length > 0
+  const gradient = buildGradient(todayEntries)
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      padding: '24px 0 20px',
+    }}>
+      {/* Cup SVG */}
+      <div style={{ position: 'relative', width: 96, height: 116 }}>
+        {/* Steam — only when filled */}
+        {filled && (
+          <div style={{
+            position: 'absolute',
+            top: -18,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 6,
+          }}>
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                style={{
+                  width: 3,
+                  height: 14,
+                  borderRadius: 2,
+                  background: 'var(--text-muted)',
+                  opacity: 0.45,
+                  animation: `steamRise 1.6s ease-in-out ${i * 0.35}s infinite`,
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        <svg
+          viewBox="0 0 96 110"
+          width="96"
+          height="110"
+          style={{ display: 'block', overflow: 'visible' }}
+        >
+          <defs>
+            {/* Clip path matches the cup interior exactly */}
+            <clipPath id="cup-interior-clip">
+              <path d="M 14 20 L 19 96 Q 48 108 77 96 L 82 20 Z" />
+            </clipPath>
+          </defs>
+
+          {/* Liquid fill — foreignObject lets us use CSS gradient */}
+          {filled && (
+            <foreignObject
+              x="14" y="20" width="68" height="76"
+              clipPathUnits="userSpaceOnUse"
+              style={{ clipPath: 'url(#cup-interior-clip)' }}
+            >
+              <div
+                xmlns="http://www.w3.org/1999/xhtml"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  background: gradient,
+                }}
+              />
+            </foreignObject>
+          )}
+
+          {/* Cup outline — always visible */}
+          {/* Rim */}
+          <rect
+            x="10" y="14" width="76" height="9" rx="4.5"
+            fill={filled ? 'var(--surface-raised)' : 'var(--surface)'}
+            stroke="var(--border-strong)"
+            strokeWidth="1.5"
+          />
+          {/* Body */}
+          <path
+            d="M 14 20 L 19 96 Q 48 108 77 96 L 82 20 Z"
+            fill={filled ? 'none' : 'var(--surface)'}
+            stroke="var(--border-strong)"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          {/* Handle */}
+          <path
+            d="M 82 36 Q 100 36 100 58 Q 100 80 82 80"
+            fill="none"
+            stroke="var(--border-strong)"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+
+      {/* Label */}
+      <p style={{
+        fontSize: 12,
+        color: 'var(--text-muted)',
+        marginTop: 8,
+        fontFamily: 'var(--font-body)',
+      }}>
+        {filled
+          ? todayEntries.length === 1
+            ? 'today\'s brew'
+            : `${todayEntries.length} brews today`
+          : 'nothing logged yet today'
+        }
+      </p>
+
+      {/* Streak chip — only shown when streak > 0 */}
+      {streak > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2, delay: 0.1 }}
+          style={{
+            marginTop: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 99,
+            padding: '4px 12px',
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-body)',
+          }}
+        >
+          <span style={{ fontSize: 13 }}>📸</span>
+          <span>
+            {streak} {streak === 1 ? 'day' : 'days'} logged
+          </span>
+        </motion.div>
+      )}
     </div>
-    {entry.rating && <StarRating value={entry.rating} readOnly />}
-  </div>
-</motion.div>
+  )
+}
 ```
 
-CSS targets:
-- `.entry-card`: `background: var(--surface-raised)`, `border: 1px solid var(--border)`, `border-radius: var(--radius-md)`, `box-shadow: var(--shadow-card)`, `display: flex`, `overflow: hidden`, `cursor: pointer`, min-height 88px
-- `.entry-card__photo`: `width: 72px`, `flex-shrink: 0`, `background: var(--surface)`
-- `.entry-card__photo img`: `width:100%`, `height:100%`, `object-fit:cover`
-- `.entry-card__photo-placeholder[data-type="coffee"]`: `background: var(--accent-coffee)` with a ☕ emoji centered
-- `.entry-card__photo-placeholder[data-type="matcha"]`: `background: var(--accent-matcha)` with a 🍵 emoji centered
-- `.entry-card__body`: `padding: 12px 14px`, `flex:1`, `display:flex`, `flex-direction:column`, `justify-content:center`, `gap:4px`
-- `.entry-card__name`: `font-family: var(--font-display)`, `font-size: 17px`, `color: var(--text-primary)`, no margin
-- `.entry-card__badge[data-type="coffee"]`: `background: #fdf0e0`, `color: var(--accent-coffee-dark)`, `font-size:11px`, `padding:2px 8px`, `border-radius:20px`
-- `.entry-card__badge[data-type="matcha"]`: `background: #e8f4ec`, `color: var(--accent-matcha-dark)`
-- `.entry-card__time`: `font-size: 12px`, `color: var(--text-muted)`
+Also add this CSS keyframe to `src/index.css`:
 
-- [ ] Rewrite EntryCard.jsx with the above structure and styles
-- [ ] Accept `index` prop from FeedPage for stagger delay
-- [ ] Commit: `feat: redesign EntryCard with warm card style and stagger animation`
+```css
+@keyframes steamRise {
+  0%, 100% { transform: translateY(0) scaleY(1); opacity: 0.45; }
+  50%       { transform: translateY(-7px) scaleY(1.15); opacity: 0.15; }
+}
+```
+
+- [ ] Create `src/components/DailyCup.jsx` with the code above
+- [ ] Add `@keyframes steamRise` to `src/index.css`
+- [ ] Commit: `feat: add DailyCup component with layered gradient and streak chip`
 
 ---
 
-### Task 3 — StarRating.jsx
+## Task 4 — `src/components/ColorPicker.jsx`
 
-Make each star animate on tap. Stars should be larger and more tactile.
+This component is rendered in AddPage immediately below the photo preview (only when a photo exists). It shows the auto-extracted colour swatch, a label, and a "Pick from photo" button. Pressing that button enters eyedropper mode: the photo is displayed again with pointer events active; moving a finger shows a circular magnifier near the touch point; releasing sets the colour.
+
+The component receives:
+- `photoDataUrl` — the compressed photo string from AddPage state
+- `color` — current hex colour string
+- `onChange(hex)` — called when colour changes (both auto-extract result and manual picks)
+
+Auto-extraction runs once when `photoDataUrl` first appears (via `useEffect`).
 
 ```jsx
-// Each star:
-<motion.button
-  key={i}
-  whileTap={{ scale: 1.35 }}
-  transition={{ duration: 0.12 }}
-  onClick={() => !readOnly && onChange(i + 1)}
-  style={{ fontSize: readOnly ? '18px' : '24px', background:'none', border:'none', cursor: readOnly ? 'default' : 'pointer', padding:'2px' }}
->
-  {i < value ? '★' : '☆'}
-</motion.button>
+import { useState, useEffect, useRef } from 'react'
+import { extractDominantColor, buildPickerCanvas, sampleCanvasAt } from '../utils/extractColor'
+
+export default function ColorPicker({ photoDataUrl, color, onChange }) {
+  const [picking, setPicking] = useState(false)
+  const [magnifier, setMagnifier] = useState(null) // { x, y, color }
+  const pickerRef = useRef(null)   // <img> element in eyedropper mode
+  const canvasRef = useRef(null)   // { canvas, ctx } built on pick start
+  const ctxRef = useRef(null)
+
+  // Auto-extract dominant colour whenever the photo changes
+  useEffect(() => {
+    if (!photoDataUrl) return
+    extractDominantColor(photoDataUrl).then(onChange)
+  }, [photoDataUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function startPicking() {
+    const result = await buildPickerCanvas(photoDataUrl)
+    if (!result) return
+    canvasRef.current = result.canvas
+    ctxRef.current = result.ctx
+    setPicking(true)
+    setMagnifier(null)
+  }
+
+  function handlePointerMove(e) {
+    e.preventDefault()
+    if (!ctxRef.current || !canvasRef.current || !pickerRef.current) return
+    const touch = e.touches ? e.touches[0] : e
+    const sampled = sampleCanvasAt(
+      ctxRef.current,
+      canvasRef.current,
+      pickerRef.current,
+      touch.clientX,
+      touch.clientY,
+    )
+    const rect = pickerRef.current.getBoundingClientRect()
+    setMagnifier({
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top,
+      color: sampled,
+    })
+  }
+
+  function handlePointerUp(e) {
+    e.preventDefault()
+    if (!ctxRef.current || !canvasRef.current || !pickerRef.current) return
+    const touch = e.changedTouches ? e.changedTouches[0] : e
+    const sampled = sampleCanvasAt(
+      ctxRef.current,
+      canvasRef.current,
+      pickerRef.current,
+      touch.clientX,
+      touch.clientY,
+    )
+    onChange(sampled)
+    setPicking(false)
+    setMagnifier(null)
+  }
+
+  if (!photoDataUrl) return null
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {/* Swatch row — always visible */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 14px',
+        background: 'var(--surface)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border)',
+      }}>
+        {/* Colour swatch */}
+        <div style={{
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: color || '#c97b3a',
+          border: '2px solid var(--border-strong)',
+          flexShrink: 0,
+        }} />
+        <span style={{
+          flex: 1,
+          fontSize: 13,
+          color: 'var(--text-secondary)',
+          fontFamily: 'var(--font-body)',
+        }}>
+          Drink colour
+        </span>
+        <button
+          type="button"
+          onClick={startPicking}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: 12,
+            color: 'var(--accent-coffee)',
+            fontFamily: 'var(--font-body)',
+            cursor: 'pointer',
+            padding: '4px 0',
+            fontWeight: 500,
+          }}
+        >
+          Pick from photo
+        </button>
+      </div>
+
+      {/* Eyedropper overlay — shown when picking=true */}
+      {picking && (
+        <div style={{ marginTop: 8, position: 'relative', userSelect: 'none' }}>
+          <p style={{
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-body)',
+            marginBottom: 6,
+            textAlign: 'center',
+          }}>
+            Touch the photo to pick a colour
+          </p>
+          <div style={{ position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+            {/* The photo with pointer events */}
+            <img
+              ref={pickerRef}
+              src={photoDataUrl}
+              alt=""
+              draggable={false}
+              style={{
+                width: '100%',
+                display: 'block',
+                cursor: 'crosshair',
+                WebkitUserSelect: 'none',
+                userSelect: 'none',
+                touchAction: 'none',
+              }}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onTouchMove={handlePointerMove}
+              onTouchEnd={handlePointerUp}
+            />
+
+            {/* Magnifier circle — follows finger */}
+            {magnifier && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: magnifier.x - 26,
+                  top: magnifier.y - 56,     // above the finger
+                  width: 52,
+                  height: 52,
+                  borderRadius: '50%',
+                  background: magnifier.color,
+                  border: '3px solid white',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.28)',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+          </div>
+
+          {/* Cancel */}
+          <button
+            type="button"
+            onClick={() => { setPicking(false); setMagnifier(null) }}
+            style={{
+              marginTop: 8,
+              width: '100%',
+              padding: '10px',
+              background: 'none',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 13,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 ```
 
-Star colour when filled: `var(--accent-coffee)`. When empty: `var(--border-strong)`.
-
-- [ ] Rewrite StarRating.jsx with motion stars
-- [ ] Commit: `feat: tactile star rating with motion`
+- [ ] Create `src/components/ColorPicker.jsx` with the code above
+- [ ] Commit: `feat: add ColorPicker with auto-extract and eyedropper`
 
 ---
 
-### Task 4 — FeedPage.jsx
+## Task 5 — Update `src/context/BrewContext.jsx`
 
-Page wrapper should animate in. FAB should have whileTap. Empty state should use new copy.
+Add `color` to the entry object created in `addEntry`. The field is optional — if not passed, it is omitted (existing entries without a color field will still render fine; components fall back to `'#c97b3a'`).
+
+Find the `addEntry` function in `BrewContext.jsx`. It currently looks like:
+
+```js
+function addEntry({ type, name, photo, rating, notes }) {
+  dispatch({
+    type: 'ADD',
+    entry: {
+      id: crypto.randomUUID(),
+      type,
+      name,
+      timestamp: Date.now(),
+      ...(photo != null && { photo }),
+      ...(rating != null && { rating }),
+      ...(notes != null && { notes }),
+    },
+  })
+}
+```
+
+Replace it with:
+
+```js
+function addEntry({ type, name, photo, rating, notes, color }) {
+  dispatch({
+    type: 'ADD',
+    entry: {
+      id: crypto.randomUUID(),
+      type,
+      name,
+      timestamp: Date.now(),
+      ...(photo != null && { photo }),
+      ...(rating != null && { rating }),
+      ...(notes != null && { notes }),
+      ...(color != null && { color }),
+    },
+  })
+}
+```
+
+- [ ] Make the above change to `src/context/BrewContext.jsx`
+- [ ] Commit: `feat: add color field to BrewContext entry schema`
+
+---
+
+## Task 6 — Update `src/pages/AddPage.jsx`
+
+Three changes:
+1. Add `color` state (default `'#c97b3a'`)
+2. Import and render `<ColorPicker>` immediately after `<PhotoPicker>` in the form
+3. Pass `color` to `addEntry`
+
+**Import additions** at top of file — add:
+```js
+import ColorPicker from '../components/ColorPicker'
+```
+
+**State addition** inside the component, alongside existing state declarations:
+```js
+const [color, setColor] = useState('#c97b3a')
+```
+
+**In `handleSave`** — update the `addEntry` call to include color:
+```js
+addEntry({
+  type,
+  name: name.trim(),
+  ...(photo && { photo }),
+  ...(rating > 0 && { rating }),
+  ...(notes.trim() && { notes: notes.trim() }),
+  color,
+})
+```
+
+**In the JSX**, immediately after the `<PhotoPicker>` closing tag (inside the Photo `<div>` section), add:
+```jsx
+<ColorPicker
+  photoDataUrl={photo}
+  color={color}
+  onChange={setColor}
+/>
+```
+
+`ColorPicker` returns `null` when `photoDataUrl` is falsy, so it only appears after a photo is selected. No conditional wrapping needed here.
+
+- [ ] Apply the three changes above to `src/pages/AddPage.jsx`
+- [ ] Commit: `feat: integrate ColorPicker into AddPage`
+
+---
+
+## Task 7 — Update `src/pages/FeedPage.jsx`
+
+Two additions: import and render `<DailyCup>` between the page header and the entry list.
+
+**Import additions** at top of file:
+```js
+import DailyCup from '../components/DailyCup'
+import { calcPhotoStreak } from '../utils/streakCalc'
+```
+
+**Derived values** inside the component, before the return statement:
+```js
+const todayStr = new Date().toDateString()
+const todayEntries = [...entries]
+  .filter(e => new Date(e.timestamp).toDateString() === todayStr)
+  .sort((a, b) => a.timestamp - b.timestamp) // oldest first = bottom of cup
+
+const streak = calcPhotoStreak(entries)
+```
+
+**In the JSX**, place `<DailyCup>` after the sticky header `<div>` and before the empty-state check / entry list. The FeedPage currently has a structure like:
 
 ```jsx
-// Page wrapper:
-<motion.div
-  className="feed-page"
-  initial={{ opacity:0, y:10 }}
-  animate={{ opacity:1, y:0 }}
-  transition={{ duration:0.25, ease:[0.4,0,0.2,1] }}
->
+<div style={{ minHeight: '100dvh', ... }}>
+  {/* Header */}
+  <div style={{ ... }}>...</div>
+
+  {/* Empty state / entry list */}
+  ...
 ```
 
-CSS:
-- `.feed-page`: `padding: 16px 16px 100px`, `max-width: 480px`, `margin: 0 auto`
-- Page heading: `font-family: var(--font-display)`, `font-size: 28px`, `color: var(--text-primary)`, `margin-bottom: 20px`
-- Entry list: `display:flex`, `flex-direction:column`, `gap:10px`
-- FAB: `position:fixed`, `bottom:28px`, `right:24px`, `width:56px`, `height:56px`, `border-radius:50%`, `background:var(--accent-coffee)`, `color:white`, `font-size:28px`, `border:none`, `cursor:pointer`, `box-shadow: 0 4px 16px rgba(201,123,58,0.35)`
-
-Empty state:
-```jsx
-<div className="empty-state">
-  <div className="empty-state__icon">☕</div>
-  <p className="empty-state__heading">No brews yet.</p>
-  <p className="empty-state__sub">Your future self will thank you for starting.</p>
-</div>
-```
-CSS: centred, `padding: 60px 24px`, heading in display font 22px, sub in body font muted colour.
-
-Pass `index={i}` to each EntryCard.
-
-- [ ] Rewrite FeedPage.jsx with new layout, copy, and FAB animation
-- [ ] Commit: `feat: redesign FeedPage with animated layout and empty state`
-
----
-
-### Task 5 — AddPage.jsx → convert to bottom sheet
-
-This is the most significant change. Instead of a separate route, render AddPage as a bottom sheet overlay that slides up from the bottom. Keep the `/add` route but render a fixed overlay.
+Insert `<DailyCup>` between the header and the empty-state block:
 
 ```jsx
-// In App.jsx, render AddPage as overlay over FeedPage:
-// Route /add renders:
-<>
-  <FeedPage />
-  <AddPage />  {/* renders as fixed overlay */}
-</>
-
-// AddPage structure:
-<>
-  {/* Backdrop */}
-  <motion.div
-    className="sheet-backdrop"
-    initial={{ opacity:0 }}
-    animate={{ opacity:1 }}
-    exit={{ opacity:0 }}
-    onClick={() => navigate('/')}
-  />
-  {/* Sheet */}
-  <motion.div
-    className="sheet"
-    initial={{ y:'100%' }}
-    animate={{ y:0 }}
-    exit={{ y:'100%' }}
-    transition={{ duration:0.3, ease:[0.4,0,0.2,1] }}
-  >
-    <div className="sheet__handle" />
-    <h2 className="sheet__heading">What did you make today?</h2>
-    {/* ... form fields ... */}
-    <button className="sheet__save-btn">Log it</button>
-  </motion.div>
-</>
+<DailyCup todayEntries={todayEntries} streak={streak} />
 ```
 
-For `exit` animations to work, wrap routes in `<AnimatePresence>` in App.jsx.
+Add a visual separator between DailyCup and the entry list — a thin border or padding. The simplest approach: add `borderTop: '1px solid var(--border)'` to the outer div that wraps the entry list (the one that holds the mapped `<EntryCard>` components).
 
-CSS:
-- `.sheet-backdrop`: `position:fixed`, `inset:0`, `background:rgba(61,43,31,0.3)`, `z-index:100`
-- `.sheet`: `position:fixed`, `bottom:0`, `left:0`, `right:0`, `background:var(--surface-raised)`, `border-radius:var(--radius-lg) var(--radius-lg) 0 0`, `padding:12px 20px 48px`, `z-index:101`, `max-height:92vh`, `overflow-y:auto`
-- `.sheet__handle`: `width:36px`, `height:4px`, `background:var(--border-strong)`, `border-radius:2px`, `margin:0 auto 20px`
-- `.sheet__heading`: `font-family:var(--font-display)`, `font-size:22px`, `margin-bottom:20px`
-- Form inputs: `width:100%`, `padding:12px 14px`, `border:1px solid var(--border)`, `border-radius:var(--radius-sm)`, `background:var(--surface)`, `font-size:16px`, `font-family:var(--font-body)`, `color:var(--text-primary)`
-- `.sheet__save-btn`: `width:100%`, `padding:14px`, `background:var(--accent-coffee)`, `color:white`, `border:none`, `border-radius:var(--radius-md)`, `font-size:16px`, `font-weight:500`, `cursor:pointer`, `margin-top:20px`
-
-- [ ] Rewrite AddPage.jsx as a bottom sheet overlay
-- [ ] Update App.jsx to use AnimatePresence and render AddPage as overlay on /add route
-- [ ] Commit: `feat: convert add page to animated bottom sheet`
+- [ ] Apply the above changes to `src/pages/FeedPage.jsx`
+- [ ] Commit: `feat: add DailyCup and photo streak to FeedPage`
 
 ---
 
-### Task 6 — DetailPage.jsx
+## Task 8 — Smoke test
 
-Photo-first hero. Name in display font overlaid on bottom of photo.
-
-```
-┌─────────────────────┐
-│                     │
-│   [full bleed photo │
-│    or colour block] │
-│                     │
-│  name in white      │  ← absolute, bottom of hero
-│  type badge         │
-└─────────────────────┘
-  stars
-  notes block
-  [delete button — bottom]
-```
-
-CSS:
-- `.detail-hero`: `height:42vh`, `position:relative`, `overflow:hidden`, `border-radius:0 0 var(--radius-lg) var(--radius-lg)`
-- `.detail-hero img` or colour fallback: fills the hero, `object-fit:cover`
-- Coffee fallback bg: `var(--accent-coffee)`. Matcha fallback: `var(--accent-matcha)`
-- Scrim: `position:absolute`, `inset:0`, `background:linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)`
-- `.detail-hero__text`: `position:absolute`, `bottom:16px`, `left:20px`
-- `.detail-hero__name`: `font-family:var(--font-display)`, `font-size:26px`, `color:white`
-- `.detail-body`: `padding:20px`
-- `.detail-notes`: `background:var(--surface)`, `border-radius:var(--radius-sm)`, `padding:14px`, `font-size:15px`, `color:var(--text-secondary)`, `line-height:1.6`
-- Delete button: `width:100%`, `padding:14px`, `background:none`, `border:1px solid var(--danger)`, `color:var(--danger)`, `border-radius:var(--radius-md)`, `font-size:15px`, `cursor:pointer`, `margin-top:24px`
-- Delete confirm uses new copy: "Gone forever. (We won't judge.)" / "Yes, delete" / "Keep it"
-
-- [ ] Rewrite DetailPage.jsx with photo hero and new layout
-- [ ] Commit: `feat: redesign detail page with full-bleed hero`
-
----
-
-### Task 7 — final wiring and smoke test
-
-- [ ] Run `npm run dev` and verify:
-  1. Feed loads with animation, empty state shows correct copy
-  2. FAB tap navigates to /add, bottom sheet slides up
-  3. Backdrop tap dismisses sheet
-  4. Add a coffee entry — card appears in feed with stagger
-  5. Tap card — detail view opens, hero shows
-  6. Delete works with correct confirm copy
-  7. Reload page — entries persist (localStorage)
+- [ ] Run `npm run dev`
+- [ ] Verify:
+  1. FeedPage shows the empty cup outline above the entry list
+  2. Tap `+` → bottom sheet opens
+  3. Add name + photo → ColorPicker swatch appears below photo with auto-extracted colour
+  4. Tap "Pick from photo" → eyedropper mode activates, magnifier follows finger, releasing locks colour
+  5. Tap "Log it" → returns to feed, cup fills with the entry's colour, steam animates
+  6. Add a second entry with a different photo → cup shows two colour bands (first coffee on bottom, second on top)
+  7. Streak chip shows "📸 1 day logged" after the first day is complete
+  8. Entries without a photo do not increment the streak (test: delete photo before saving)
 - [ ] Run `npm run build` — no errors
-- [ ] Commit: `chore: smoke test and production build verified`
-
----
-
-## What NOT to change
-- BrewContext.jsx — logic is fine, no changes needed
-- compressImage.js — no changes needed
-- PhotoPicker.jsx — structure fine, only update styles to match new inputs
-- sw.js, manifest.json, vercel.json — no changes needed
-- All localStorage keys — do not rename
+- [ ] Commit: `chore: smoke test verified — layered cup, colour picker, photo streak`
