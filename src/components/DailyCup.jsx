@@ -1,23 +1,43 @@
 import { motion } from 'framer-motion'
 
 const FALLBACK = '#c97b3a'
+const MAX_BREWS = 3
+const CUP_TOP = 20
+const CUP_BOT = 96
+const CUP_H = CUP_BOT - CUP_TOP  // 76
 
-function buildGradient(entries) {
-  if (entries.length === 0) return null
-  if (entries.length === 1) return entries[0].color || FALLBACK
-  const n = entries.length
-  const stops = entries.map((e, i) => {
-    const color = e.color || FALLBACK
-    const from = Math.round((i / n) * 100)
-    const to = Math.round(((i + 1) / n) * 100)
-    return `${color} ${from}% ${to}%`
-  })
-  return `linear-gradient(to top, ${stops.join(', ')})`
+/**
+ * buildWavePath
+ * Returns an SVG path string for a sine-like wave that fills downward from y.
+ * The path is 4 periods wide (192px for period=48), allowing translateX(-50%)
+ * to loop seamlessly — 2 periods shift = identical wave shape.
+ */
+function buildWavePath(y, amplitude = 6, period = 48, reps = 4) {
+  let d = `M 0,${y}`
+  for (let i = 0; i < reps; i++) {
+    const x0 = i * period
+    d += ` C ${x0 + 12},${y - amplitude} ${x0 + 36},${y + amplitude} ${x0 + period},${y}`
+  }
+  d += ` L ${reps * period},200 L 0,200 Z`
+  return d
 }
 
 export default function DailyCup({ todayEntries = [], streak = 0 }) {
   const filled = todayEntries.length > 0
-  const gradient = buildGradient(todayEntries)
+  const n = Math.min(todayEntries.length, MAX_BREWS)
+
+  // Fill level: proportional to number of brews (max MAX_BREWS)
+  const fillH = n === 0 ? 0 : Math.round((n / MAX_BREWS) * CUP_H)
+  const fillY = CUP_BOT - fillH   // y-coordinate of the liquid surface
+
+  // Colour bands — oldest drink (index 0) at bottom, newest at top
+  const bands = todayEntries.slice(0, n).map((entry, i) => {
+    const yBottom = Math.round(CUP_BOT - (i / n) * fillH)
+    const yTop    = Math.round(CUP_BOT - ((i + 1) / n) * fillH)
+    return { color: entry.color || FALLBACK, y: yTop, h: yBottom - yTop }
+  })
+
+  const topColor = filled ? (todayEntries[n - 1].color || FALLBACK) : FALLBACK
 
   return (
     <div style={{
@@ -26,7 +46,9 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
       alignItems: 'center',
       padding: '24px 0 20px',
     }}>
+      {/* Cup SVG */}
       <div style={{ position: 'relative', width: 96, height: 116 }}>
+        {/* Steam — only when filled */}
         {filled && (
           <div style={{
             position: 'absolute',
@@ -64,29 +86,53 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
             </clipPath>
           </defs>
 
+          {/* Liquid fill — springs in when entry count changes */}
           {filled && (
-            <foreignObject
-              x="14" y="20" width="68" height="76"
-              clipPathUnits="userSpaceOnUse"
-              style={{ clipPath: 'url(#cup-interior-clip)' }}
+            <motion.g
+              key={n}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 20 }}
             >
-              <div
-                xmlns="http://www.w3.org/1999/xhtml"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  background: gradient,
-                }}
-              />
-            </foreignObject>
+              <g clipPath="url(#cup-interior-clip)">
+                {/* Colour bands — one rect per drink */}
+                {bands.map((band, i) => (
+                  <rect
+                    key={i}
+                    x={0}
+                    y={band.y}
+                    width={96}
+                    height={band.h}
+                    fill={band.color}
+                  />
+                ))}
+
+                {/* Wave 1 — top drink colour, rides the liquid surface */}
+                <path
+                  d={buildWavePath(fillY)}
+                  fill={topColor}
+                  style={{ animation: 'waveSlide 2.4s linear infinite' }}
+                />
+
+                {/* Wave 2 — lighter shimmer, runs in reverse for depth */}
+                <path
+                  d={buildWavePath(fillY + 2)}
+                  fill="rgba(255,255,255,0.18)"
+                  style={{ animation: 'waveSlide 3.6s linear infinite reverse' }}
+                />
+              </g>
+            </motion.g>
           )}
 
+          {/* Cup outline — always on top */}
+          {/* Rim */}
           <rect
             x="10" y="14" width="76" height="9" rx="4.5"
             fill={filled ? 'var(--surface-raised)' : 'var(--surface)'}
             stroke="var(--border-strong)"
             strokeWidth="1.5"
           />
+          {/* Body */}
           <path
             d="M 14 20 L 19 96 Q 48 108 77 96 L 82 20 Z"
             fill={filled ? 'none' : 'var(--surface)'}
@@ -94,6 +140,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
             strokeWidth="1.8"
             strokeLinejoin="round"
           />
+          {/* Handle */}
           <path
             d="M 82 36 Q 100 36 100 58 Q 100 80 82 80"
             fill="none"
@@ -104,6 +151,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
         </svg>
       </div>
 
+      {/* Label */}
       <p style={{
         fontSize: 12,
         color: 'var(--text-muted)',
@@ -112,12 +160,13 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
       }}>
         {filled
           ? todayEntries.length === 1
-            ? 'today\'s brew'
+            ? "today's brew"
             : `${todayEntries.length} brews today`
           : 'nothing logged yet today'
         }
       </p>
 
+      {/* Streak chip — only shown when streak > 0 */}
       {streak > 0 && (
         <motion.div
           initial={{ opacity: 0, scale: 0.85 }}

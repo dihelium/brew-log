@@ -3,6 +3,11 @@
   50%       { transform: translateY(-7px) scaleY(1.15); opacity: 0.15; }
 }
 
+@keyframes waveSlide {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
