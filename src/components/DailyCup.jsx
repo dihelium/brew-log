@@ -1,161 +1,215 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import mugPhoto from '../assets/mug.png'
 
-const FALLBACK = '#c97b3a'
+const FALLBACK  = '#c97b3a'
 const MAX_BREWS = 3
-const CUP_TOP = 20
-const CUP_BOT = 96
-const CUP_H = CUP_BOT - CUP_TOP  // 76
+const CUP_TOP   = 132
+const CUP_BOT   = 348
+const CUP_H     = 216   // CUP_BOT - CUP_TOP
 
-/**
- * buildWavePath
- * Returns an SVG path string for a sine-like wave that fills downward from y.
- * The path is 4 periods wide (192px for period=48), allowing translateX(-50%)
- * to loop seamlessly — 2 periods shift = identical wave shape.
- */
-function buildWavePath(y, amplitude = 6, period = 48, reps = 4) {
-  let d = `M 0,${y}`
-  for (let i = 0; i < reps; i++) {
-    const x0 = i * period
-    d += ` C ${x0 + 12},${y - amplitude} ${x0 + 36},${y + amplitude} ${x0 + period},${y}`
+function wave(y, amp, reps = 5, period = 160) {
+  let d = `M ${-reps * period},${y}`
+  for (let i = 0; i < reps * 2; i++) {
+    const x = -reps * period + i * period
+    d += ` C ${x + period * 0.25},${y - amp} ${x + period * 0.75},${y + amp} ${x + period},${y}`
   }
-  d += ` L ${reps * period},200 L 0,200 Z`
+  d += ` L ${reps * period},${y + 20} L ${-reps * period},${y + 20} Z`
   return d
 }
 
 export default function DailyCup({ todayEntries = [], streak = 0 }) {
+  const [showPhoto, setShowPhoto] = useState(false)
+
   const filled = todayEntries.length > 0
-  const n = Math.min(todayEntries.length, MAX_BREWS)
+  const n      = Math.min(todayEntries.length, MAX_BREWS)
 
-  // Fill level: proportional to number of brews (max MAX_BREWS)
-  const fillH = n === 0 ? 0 : Math.round((n / MAX_BREWS) * CUP_H)
-  const fillY = CUP_BOT - fillH   // y-coordinate of the liquid surface
+  // Reset to cross-section view whenever brew count changes
+  useEffect(() => { setShowPhoto(false) }, [todayEntries.length])
 
-  // Colour bands — oldest drink (index 0) at bottom, newest at top
-  const bands = todayEntries.slice(0, n).map((entry, i) => {
-    const yBottom = Math.round(CUP_BOT - (i / n) * fillH)
-    const yTop    = Math.round(CUP_BOT - ((i + 1) / n) * fillH)
-    return { color: entry.color || FALLBACK, y: yTop, h: yBottom - yTop }
-  })
+  // Fill geometry
+  const fillH  = n === 0 ? 0 : Math.round((n / MAX_BREWS) * CUP_H)
+  const fillY  = CUP_BOT - fillH
+  const bandH  = n > 0 ? fillH / n : 0
+
+  // Colour bands — index 0 = oldest (bottom), index n-1 = newest (top)
+  const bands = todayEntries.slice(0, n).map((entry, i) => ({
+    color: entry.color || FALLBACK,
+    y:     Math.round(CUP_BOT - (i + 1) * bandH),
+    h:     Math.round(bandH) + 2,   // +2 to prevent sub-pixel gaps
+  }))
 
   const topColor = filled ? (todayEntries[n - 1].color || FALLBACK) : FALLBACK
 
+  function handleTap() {
+    if (filled) setShowPhoto(p => !p)
+  }
+
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      padding: '24px 0 20px',
+      display:        'flex',
+      flexDirection:  'column',
+      alignItems:     'center',
+      padding:        '24px 0 20px',
     }}>
-      {/* Cup SVG */}
-      <div style={{ position: 'relative', width: 96, height: 116 }}>
-        {/* Steam — only when filled */}
-        {filled && (
-          <div style={{
-            position: 'absolute',
-            top: -18,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: 6,
-          }}>
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                style={{
-                  width: 3,
-                  height: 14,
-                  borderRadius: 2,
-                  background: 'var(--text-muted)',
-                  opacity: 0.45,
-                  animation: `steamRise 1.6s ease-in-out ${i * 0.35}s infinite`,
-                }}
-              />
-            ))}
-          </div>
-        )}
 
+      {/* Steam — State A only, when filled */}
+      {filled && !showPhoto && (
+        <div style={{
+          display:   'flex',
+          gap:       8,
+          marginBottom: 4,
+        }}>
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              style={{
+                width:        3,
+                height:       14,
+                borderRadius: 2,
+                background:   'var(--text-muted)',
+                opacity:      0.45,
+                animation:    `steamRise 1.6s ease-in-out ${i * 0.35}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Mug stage — fixed size, layers stacked absolutely */}
+      <div
+        onClick={handleTap}
+        style={{
+          position: 'relative',
+          width:    200,
+          height:   200,
+          cursor:   filled ? 'pointer' : 'default',
+        }}
+      >
+
+        {/* ── Layer A: SVG outline + liquid fill ── */}
         <svg
-          viewBox="0 0 96 110"
-          width="96"
-          height="110"
-          style={{ display: 'block', overflow: 'visible' }}
+          viewBox="0 0 400 400"
+          width="200"
+          height="200"
+          style={{
+            position: 'absolute',
+            inset:    0,
+            overflow: 'visible',
+            opacity:  showPhoto ? 0 : 1,
+            transition: 'opacity 0.22s ease',
+            zIndex:   2,
+          }}
         >
           <defs>
-            <clipPath id="cup-interior-clip">
-              <path d="M 14 20 L 19 96 Q 48 108 77 96 L 82 20 Z" />
+            <clipPath id="mug-interior-clip">
+              <path d="M 127 132 L 323 132 L 323 312 Q 322 338 298 343 Q 225 348 152 343 Q 128 338 127 312 Z"/>
             </clipPath>
           </defs>
 
-          {/* Liquid fill — springs in when entry count changes */}
+          {/* Liquid fill — spring-in when n changes */}
           {filled && (
-            <motion.g
+            <g
               key={n}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+              clipPath="url(#mug-interior-clip)"
+              style={{
+                animation: 'springIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              }}
             >
-              <g clipPath="url(#cup-interior-clip)">
-                {/* Colour bands — one rect per drink */}
-                {bands.map((band, i) => (
-                  <rect
-                    key={i}
-                    x={0}
-                    y={band.y}
-                    width={96}
-                    height={band.h}
-                    fill={band.color}
-                  />
-                ))}
-
-                {/* Wave 1 — top drink colour, rides the liquid surface */}
-                <path
-                  d={buildWavePath(fillY)}
-                  fill={topColor}
-                  style={{ animation: 'waveSlide 2.4s linear infinite' }}
+              {/* Colour bands */}
+              {bands.map((band, i) => (
+                <rect
+                  key={i}
+                  x={0}
+                  y={band.y}
+                  width={400}
+                  height={band.h}
+                  fill={band.color}
                 />
+              ))}
 
-                {/* Wave 2 — lighter shimmer, runs in reverse for depth */}
-                <path
-                  d={buildWavePath(fillY + 2)}
-                  fill="rgba(255,255,255,0.18)"
-                  style={{ animation: 'waveSlide 3.6s linear infinite reverse' }}
-                />
-              </g>
-            </motion.g>
+              {/* Wave 1 — top drink colour, rides the surface */}
+              <path
+                d={wave(fillY, 8)}
+                fill={topColor}
+                style={{ animation: 'waveSlide 2.4s linear infinite' }}
+              />
+
+              {/* Wave 2 — white shimmer, reverse direction */}
+              <path
+                d={wave(fillY + 3, 5)}
+                fill="rgba(255,255,255,0.18)"
+                style={{ animation: 'waveSlide 3.6s linear infinite reverse' }}
+              />
+            </g>
           )}
 
-          {/* Cup outline — always on top */}
+          {/* Mug outline — always on top of fill, stroke only */}
           {/* Rim */}
-          <rect
-            x="10" y="14" width="76" height="9" rx="4.5"
-            fill={filled ? 'var(--surface-raised)' : 'var(--surface)'}
+          <ellipse
+            cx="225" cy="107" rx="102" ry="21"
+            fill="none"
             stroke="var(--border-strong)"
-            strokeWidth="1.5"
+            strokeWidth="2.5"
           />
           {/* Body */}
           <path
-            d="M 14 20 L 19 96 Q 48 108 77 96 L 82 20 Z"
-            fill={filled ? 'none' : 'var(--surface)'}
+            d="M 123 107 L 124 315 Q 125 340 150 345 Q 225 350 300 345 Q 325 340 326 315 L 327 107"
+            fill="none"
             stroke="var(--border-strong)"
-            strokeWidth="1.8"
+            strokeWidth="2.5"
+            strokeLinecap="round"
             strokeLinejoin="round"
           />
           {/* Handle */}
           <path
-            d="M 82 36 Q 100 36 100 58 Q 100 80 82 80"
+            d="M 123 137 C 20 148, 20 285, 123 274"
             fill="none"
             stroke="var(--border-strong)"
-            strokeWidth="1.8"
+            strokeWidth="2.5"
             strokeLinecap="round"
           />
         </svg>
+
+        {/* ── Layer B: mug photo ── */}
+        <img
+          src={mugPhoto}
+          alt="mug"
+          draggable={false}
+          style={{
+            position:     'absolute',
+            inset:        0,
+            width:        '100%',
+            height:       '100%',
+            objectFit:    'contain',
+            mixBlendMode: 'multiply',
+            opacity:      showPhoto ? 1 : 0,
+            transition:   'opacity 0.22s ease',
+            zIndex:       1,
+            userSelect:   'none',
+          }}
+        />
       </div>
 
-      {/* Label */}
+      {/* State hint — only when filled */}
+      {filled && (
+        <p style={{
+          fontSize:   10,
+          color:      'var(--text-muted)',
+          marginTop:  4,
+          fontFamily: 'var(--font-body)',
+          fontStyle:  'italic',
+          minHeight:  14,
+        }}>
+          {showPhoto ? 'tap to see inside' : 'tap to see outside'}
+        </p>
+      )}
+
+      {/* Brew count label */}
       <p style={{
-        fontSize: 12,
-        color: 'var(--text-muted)',
-        marginTop: 8,
+        fontSize:   12,
+        color:      'var(--text-muted)',
+        marginTop:  filled ? 2 : 8,
         fontFamily: 'var(--font-body)',
       }}>
         {filled
@@ -166,30 +220,28 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
         }
       </p>
 
-      {/* Streak chip — only shown when streak > 0 */}
+      {/* Streak chip — unchanged */}
       {streak > 0 && (
         <motion.div
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2, delay: 0.1 }}
           style={{
-            marginTop: 8,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
+            marginTop:   8,
+            display:     'inline-flex',
+            alignItems:  'center',
+            gap:         5,
+            background:  'var(--surface)',
+            border:      '1px solid var(--border)',
             borderRadius: 99,
-            padding: '4px 12px',
-            fontSize: 12,
-            color: 'var(--text-secondary)',
-            fontFamily: 'var(--font-body)',
+            padding:     '4px 12px',
+            fontSize:    12,
+            color:       'var(--text-secondary)',
+            fontFamily:  'var(--font-body)',
           }}
         >
           <span style={{ fontSize: 13 }}>📸</span>
-          <span>
-            {streak} {streak === 1 ? 'day' : 'days'} logged
-          </span>
+          <span>{streak} {streak === 1 ? 'day' : 'days'} logged</span>
         </motion.div>
       )}
     </div>
