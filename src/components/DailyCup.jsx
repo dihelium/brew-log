@@ -80,10 +80,11 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
       <div
         onClick={handleTap}
         style={{
-          position: 'relative',
-          width:    200,
-          height:   200,
-          cursor:   filled ? 'pointer' : 'default',
+          position:   'relative',
+          width:      200,
+          height:     200,
+          background: 'white',
+          cursor:     filled ? 'pointer' : 'default',
         }}
       >
 
@@ -98,7 +99,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
             overflow: 'visible',
             opacity:  showPhoto ? 0 : 1,
             transition: 'opacity 0.22s ease',
-            zIndex:   2,
+            zIndex:   1,
           }}
         >
           <defs>
@@ -185,7 +186,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
             mixBlendMode: 'multiply',
             opacity:      showPhoto ? 1 : 0,
             transition:   'opacity 0.22s ease',
-            zIndex:       1,
+            zIndex:       2,
             userSelect:   'none',
           }}
         />
