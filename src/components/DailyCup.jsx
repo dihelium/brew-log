@@ -83,7 +83,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
           position:   'relative',
           width:      200,
           height:     200,
-          background: 'white',
+          background: showPhoto ? 'white' : 'transparent',
           cursor:     filled ? 'pointer' : 'default',
         }}
       >
