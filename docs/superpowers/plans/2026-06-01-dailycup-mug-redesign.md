@@ -65,7 +65,7 @@ git commit -m "feat: add springIn keyframe for mug fill animation"
 
 **State A (default):** An SVG mug outline (stroke only, transparent body) with liquid fill inside a `<clipPath>`. The fill is 1–3 colour band `<rect>`s rising from the bottom, topped by two animated wave paths. Steam wisps show above the rim when at least one brew is logged. Tapping the mug toggles to State B.
 
-**State B:** The `mug.png` photo displayed at the same position/size, with `mix-blend-mode: multiply` to dissolve its white background on the cream app surface. Tapping returns to State A.
+**State B:** The `mug.png` photo displayed at the same position/size. The mug stage div has `background: 'white'` so that `mix-blend-mode: multiply` on the photo composites against a known white surface — this makes the mug's white background disappear while leaving the mug's coloured body fully visible. The photo layer sits at `zIndex: 2` (above the SVG at `zIndex: 1`) so there is no paint-order interference with blend modes. Tapping returns to State A.
 
 **SVG coordinate system:** `viewBox="0 0 400 400"`. All path coordinates below are in this space.
 
@@ -196,29 +196,34 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
         </div>
       )}
 
-      {/* Mug stage — fixed size, layers stacked absolutely */}
+      {/* Mug stage — fixed size, layers stacked absolutely.
+          background:'white' is REQUIRED: the photo uses mix-blend-mode:multiply
+          which composites against this white surface to dissolve the mug's
+          white background. Without it the photo composites against the page
+          and may appear washed-out or invisible. */}
       <div
         onClick={handleTap}
         style={{
-          position: 'relative',
-          width:    200,
-          height:   200,
-          cursor:   filled ? 'pointer' : 'default',
+          position:   'relative',
+          width:      200,
+          height:     200,
+          background: 'white',
+          cursor:     filled ? 'pointer' : 'default',
         }}
       >
 
-        {/* ── Layer A: SVG outline + liquid fill ── */}
+        {/* ── Layer A: SVG outline + liquid fill — zIndex:1 (below photo) ── */}
         <svg
           viewBox="0 0 400 400"
           width="200"
           height="200"
           style={{
-            position: 'absolute',
-            inset:    0,
-            overflow: 'visible',
-            opacity:  showPhoto ? 0 : 1,
+            position:   'absolute',
+            inset:      0,
+            overflow:   'visible',
+            opacity:    showPhoto ? 0 : 1,
             transition: 'opacity 0.22s ease',
-            zIndex:   2,
+            zIndex:     1,
           }}
         >
           <defs>
@@ -291,7 +296,10 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
           />
         </svg>
 
-        {/* ── Layer B: mug photo ── */}
+        {/* ── Layer B: mug photo — zIndex:2 (above SVG) ── */}
+        {/* mix-blend-mode:multiply composites against the white stage background:
+            white-bg pixels → disappear, coloured mug body → stays visible.
+            zIndex:2 ensures the photo is the topmost layer; SVG beneath at zIndex:1. */}
         <img
           src={mugPhoto}
           alt="mug"
@@ -305,7 +313,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
             mixBlendMode: 'multiply',
             opacity:      showPhoto ? 1 : 0,
             transition:   'opacity 0.22s ease',
-            zIndex:       1,
+            zIndex:       2,
             userSelect:   'none',
           }}
         />
@@ -444,3 +452,5 @@ git commit -m "feat: replace geometric mug with two-state illustrated mug (cross
 - [x] **`key={n}` on fill `<g>`:** This is the mechanism that re-triggers the `springIn` CSS animation — React unmounts and remounts the `<g>` element when `n` changes, causing the animation to restart from scratch. This is intentional and correct.
 
 - [x] **`clipPath id` uniqueness:** `id="mug-interior-clip"` — if multiple `DailyCup` instances render simultaneously (they won't in this app — only one on FeedPage), SVG clipPath IDs would collide. Not a problem here; no fix needed.
+
+- [x] **Photo visibility fix (v2):** Mug stage now has `background: 'white'`. Photo layer is `zIndex: 2`, SVG is `zIndex: 1`. This ensures `mix-blend-mode: multiply` on the photo composites against a known white surface (not the app page), making the mug's white background disappear while keeping the illustrated body visible. Without this the photo would appear washed-out or invisible on tap.
