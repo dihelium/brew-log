@@ -10,7 +10,19 @@ createRoot(document.getElementById('root')).render(
 )
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
-  })
+  if (import.meta.env.PROD) {
+    // Production: register the offline service worker.
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    })
+  } else {
+    // Dev: a previously-registered SW serves stale cached modules on reload
+    // (cache-first), hiding code changes. Unregister it and clear its caches.
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister())
+    })
+    if (window.caches) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
+    }
+  }
 }
