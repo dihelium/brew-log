@@ -53,29 +53,6 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
       padding:        '24px 0 20px',
     }}>
 
-      {/* Steam — State A only, when filled */}
-      {filled && !showPhoto && (
-        <div style={{
-          display:   'flex',
-          gap:       8,
-          marginBottom: 4,
-        }}>
-          {[0, 1, 2].map(i => (
-            <div
-              key={i}
-              style={{
-                width:        3,
-                height:       14,
-                borderRadius: 2,
-                background:   'var(--text-muted)',
-                opacity:      0.45,
-                animation:    `steamRise 1.6s ease-in-out ${i * 0.35}s infinite`,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
       {/* Mug stage — fixed size, layers stacked absolutely */}
       <div
         onClick={handleTap}
@@ -86,6 +63,35 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
           cursor:     filled ? 'pointer' : 'default',
         }}
       >
+
+        {/* Steam — absolutely positioned above the rim so toggling states
+            never shifts the cup. Centered over the mug body (56%), State A only. */}
+        {filled && !showPhoto && (
+          <div style={{
+            position:  'absolute',
+            top:       18,
+            left:      '56%',
+            transform: 'translateX(-50%)',
+            display:   'flex',
+            gap:       8,
+            zIndex:    3,
+            pointerEvents: 'none',
+          }}>
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                style={{
+                  width:        3,
+                  height:       14,
+                  borderRadius: 2,
+                  background:   'var(--text-muted)',
+                  opacity:      0.45,
+                  animation:    `steamRise 1.6s ease-in-out ${i * 0.35}s infinite`,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* ── Layer A: SVG outline + liquid fill ── */}
         <svg
@@ -163,7 +169,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
           />
           {/* Handle */}
           <path
-            d="M 124 135 C 44 148, 44 308, 124 296"
+            d="M 121 127 C 74 119, 49 150, 46 185 C 43 224, 68 270, 123 301"
             fill="none"
             stroke="var(--border-strong)"
             strokeWidth="2.5"
