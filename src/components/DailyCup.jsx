@@ -83,7 +83,6 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
           position:   'relative',
           width:      200,
           height:     200,
-          background: showPhoto ? 'white' : 'transparent',
           cursor:     filled ? 'pointer' : 'default',
         }}
       >
@@ -164,7 +163,7 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
           />
           {/* Handle */}
           <path
-            d="M 123 137 C 20 148, 20 285, 123 274"
+            d="M 124 135 C 44 148, 44 308, 124 296"
             fill="none"
             stroke="var(--border-strong)"
             strokeWidth="2.5"
@@ -183,7 +182,6 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
             width:        '100%',
             height:       '100%',
             objectFit:    'contain',
-            mixBlendMode: 'multiply',
             opacity:      showPhoto ? 1 : 0,
             transition:   'opacity 0.22s ease',
             zIndex:       2,

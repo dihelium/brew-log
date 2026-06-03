@@ -5,6 +5,7 @@ import { useBrew } from '../context/BrewContext'
 import StarRating from '../components/StarRating'
 import PhotoPicker from '../components/PhotoPicker'
 import ColorPicker from '../components/ColorPicker'
+import { playDrop } from '../utils/dropSound'
 
 export default function AddPage() {
   const navigate = useNavigate()
@@ -27,6 +28,7 @@ export default function AddPage() {
       ...(notes.trim() && { notes: notes.trim() }),
       color,
     })
+    playDrop()
     navigate('/')
   }
 
