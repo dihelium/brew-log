@@ -4,8 +4,8 @@
  *
  * Sound: "water drop" (Plop) by florianreichelt — Freesound #683102,
  * licensed Creative Commons 0 (public domain). https://freesound.org/s/683102/
- * Time-stretched to 1.8x length (pitch preserved) and bundled as
- * src/assets/drop.mp3.
+ * Original plop kept at its natural pitch and attack, with an added
+ * reverb tail so it rings out ~1.8x longer. Bundled as src/assets/drop.mp3.
  *
  * Decoded once into an AudioBuffer for low-latency, overlap-safe playback.
  * Falls back to an HTMLAudioElement if Web Audio is unavailable.
