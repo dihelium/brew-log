@@ -2,9 +2,10 @@
  * playDrop
  * Plays a short water-drop "plop" when a brew is logged.
  *
- * Sound: "Single Water Drop" by paespedro — Freesound #174718, licensed
- * Creative Commons 0 (public domain). https://freesound.org/s/174718/
- * Trimmed/normalised and bundled as src/assets/drop.mp3.
+ * Sound: "water drop" (Plop) by florianreichelt — Freesound #683102,
+ * licensed Creative Commons 0 (public domain). https://freesound.org/s/683102/
+ * Time-stretched to 1.8x length (pitch preserved) and bundled as
+ * src/assets/drop.mp3.
  *
  * Decoded once into an AudioBuffer for low-latency, overlap-safe playback.
  * Falls back to an HTMLAudioElement if Web Audio is unavailable.
