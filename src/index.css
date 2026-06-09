@@ -163,6 +163,7 @@ button, input, textarea {
   font-size: 28px;
   color: var(--text-primary);
   margin-bottom: 20px;
+  text-align: center;
 }
 
 .feed-page__list {
