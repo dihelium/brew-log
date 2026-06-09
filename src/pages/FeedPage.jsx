@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import EntryCard from '../components/EntryCard'
 import DailyCup from '../components/DailyCup'
+import BackupControls from '../components/BackupControls'
 import { calcPhotoStreak } from '../utils/streakCalc'
 
 export default function FeedPage() {
@@ -40,6 +41,8 @@ export default function FeedPage() {
           ))}
         </div>
       )}
+
+      <BackupControls />
 
       <motion.button
         className="feed-page__fab"
