@@ -25,7 +25,7 @@ function memCache() {
 
 function okSupabase(rows = []) {
   return {
-    _uploads: [], _upserts: [], _deletes: [],
+    _uploads: [], _upserts: [], _deletes: [], _removes: [],
     from() {
       return {
         upsert: async (row) => { fakeSb._upserts.push(row); return { error: null } },
@@ -37,7 +37,7 @@ function okSupabase(rows = []) {
       from() {
         return {
           upload: async (path, blob) => { fakeSb._uploads.push({ path, blob }); return { error: null } },
-          remove: async () => ({ error: null }),
+          remove: async (paths) => { fakeSb._removes.push(...paths); return { error: null } },
           download: async () => ({ data: new Blob(['img'], { type: 'image/jpeg' }), error: null }),
         }
       },
@@ -80,6 +80,24 @@ describe('flushOutbox', () => {
     expect(res.ok).toBe(false)
     expect(await c.allOps()).toHaveLength(1)
   })
+
+  it('removes the deterministic photo path on delete when only hasPhoto is known', async () => {
+    fakeSb = okSupabase()
+    const c = memCache()
+    // photo_path never synced back, but the entry is known to have a photo.
+    await c.enqueue('delete', { id: 'a', photo_path: null, hasPhoto: true })
+    const res = await flushOutbox(fakeSb, c, 'u1')
+    expect(res.ok).toBe(true)
+    expect(fakeSb._removes).toContain('u1/a.jpg')
+  })
+
+  it('does not remove any object when the deleted entry had no photo', async () => {
+    fakeSb = okSupabase()
+    const c = memCache()
+    await c.enqueue('delete', { id: 'a', photo_path: null, hasPhoto: false })
+    await flushOutbox(fakeSb, c, 'u1')
+    expect(fakeSb._removes).toHaveLength(0)
+  })
 })
 
 describe('pullRemote', () => {
@@ -102,5 +120,24 @@ describe('pullRemote', () => {
     await c.enqueue('delete', { id: 'a', photo_path: null })
     await pullRemote(fakeSb, c, 'u1')
     expect(await c.getEntry('a')).toBeUndefined()
+  })
+
+  it('prunes local entries deleted on another device', async () => {
+    fakeSb = okSupabase([]) // server has no rows
+    const c = memCache()
+    await c.putEntry({ id: 'gone', name: 'X', timestamp: 1, hasPhoto: false })
+    await c.putPhotoBlob('gone', new Blob(['x'], { type: 'image/jpeg' }))
+    await pullRemote(fakeSb, c)
+    expect(await c.getEntry('gone')).toBeUndefined()
+    expect(await c.getPhotoBlob('gone')).toBeUndefined()
+  })
+
+  it('keeps un-synced local creates absent from the server', async () => {
+    fakeSb = okSupabase([]) // server has no rows yet
+    const c = memCache()
+    await c.putEntry({ id: 'new', name: 'X', timestamp: 1, hasPhoto: false })
+    await c.enqueue('add', { id: 'new', name: 'X', timestamp: 1 })
+    await pullRemote(fakeSb, c)
+    expect(await c.getEntry('new')).toMatchObject({ id: 'new' })
   })
 })

@@ -59,8 +59,13 @@ export async function flushOutbox(supabase, cache, userId) {
       } else if (item.op === 'delete') {
         const { error } = await supabase.from('entries').delete().eq('id', item.entry.id)
         if (error) throw error
-        if (item.entry.photo_path) {
-          await supabase.storage.from(BUCKET).remove([item.entry.photo_path])
+        // Use the stored path, or reconstruct the deterministic one when the
+        // entry was deleted before its photo_path was ever synced back. This
+        // covers the offline add-then-delete case so no storage object leaks.
+        const path = item.entry.photo_path
+          || (item.entry.hasPhoto ? `${userId}/${item.entry.id}.jpg` : null)
+        if (path) {
+          await supabase.storage.from(BUCKET).remove([path])
         }
       }
       await cache.removeOp(item.seq)
@@ -75,6 +80,8 @@ export async function flushOutbox(supabase, cache, userId) {
  * pullRemote — fetch the user's rows, update the entries cache, and download
  * any photo blobs not already cached. Rows with a pending local delete are
  * skipped so a just-deleted entry doesn't reappear before its delete syncs.
+ * Local entries absent from the server (deleted on another device) are pruned,
+ * unless they're still waiting to upload locally (pending add).
  * RLS scopes the query to the signed-in user, so no userId argument is needed.
  */
 export async function pullRemote(supabase, cache) {
@@ -86,6 +93,17 @@ export async function pullRemote(supabase, cache) {
 
   const ops = await cache.allOps()
   const pendingDeletes = new Set(ops.filter(o => o.op === 'delete').map(o => o.entry.id))
+  const pendingAdds = new Set(ops.filter(o => o.op === 'add').map(o => o.entry.id))
+  const serverIds = new Set(data.map(r => r.id))
+
+  // Prune entries that were deleted on another device. Keep un-synced local
+  // creates (pending add) so they aren't lost before they reach the server.
+  for (const local of await cache.allEntries()) {
+    if (!serverIds.has(local.id) && !pendingAdds.has(local.id)) {
+      await cache.removeEntry(local.id)
+      await cache.removePhotoBlob(local.id)
+    }
+  }
 
   for (const row of data) {
     if (pendingDeletes.has(row.id)) continue

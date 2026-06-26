@@ -43,6 +43,15 @@ export function BrewProvider({ children }) {
       }
       ui.push({ ...row, photo })
     }
+    // Revoke object URLs for entries no longer in the cache (e.g. pruned by a
+    // remote delete) so they don't leak.
+    const liveIds = new Set(rows.map(r => r.id))
+    for (const [id, url] of urls) {
+      if (!liveIds.has(id)) {
+        URL.revokeObjectURL(url)
+        urls.delete(id)
+      }
+    }
     setEntries(ui)
   }
 
@@ -128,7 +137,11 @@ export function BrewProvider({ children }) {
     await cache.removePhotoBlob(id)
     const url = urlsRef.current.get(id)
     if (url) { URL.revokeObjectURL(url); urlsRef.current.delete(id) }
-    await cache.enqueue('delete', { id, photo_path: existing?.photo_path ?? null })
+    await cache.enqueue('delete', {
+      id,
+      photo_path: existing?.photo_path ?? null,
+      hasPhoto: !!existing?.hasPhoto,
+    })
     setEntries(prev => prev.filter(e => e.id !== id))
     runSync()
   }
