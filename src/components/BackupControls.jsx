@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useBrew } from '../context/BrewContext'
+import { useAuth } from '../context/AuthContext'
 
 const btnStyle = {
   flex: 1,
@@ -15,12 +16,14 @@ const btnStyle = {
 }
 
 export default function BackupControls() {
-  const { entries, importEntries } = useBrew()
+  const { entries, importEntries, exportEntries } = useBrew()
+  const { signOut } = useAuth()
   const fileRef = useRef(null)
   const [status, setStatus] = useState('')
 
   async function handleExport() {
-    const json = JSON.stringify(entries, null, 2)
+    const data = await exportEntries()
+    const json = JSON.stringify(data, null, 2)
     const filename = `brew-log-backup-${new Date().toISOString().slice(0, 10)}.json`
     const file = new File([json], filename, { type: 'application/json' })
 
@@ -115,6 +118,25 @@ export default function BackupControls() {
           {status}
         </p>
       )}
+
+      <button
+        type="button"
+        onClick={signOut}
+        style={{
+          marginTop: 16,
+          width: '100%',
+          padding: '10px 12px',
+          background: 'none',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)',
+          fontSize: 13,
+          color: 'var(--text-muted)',
+          fontFamily: 'var(--font-body)',
+          cursor: 'pointer',
+        }}
+      >
+        Sign out
+      </button>
     </div>
   )
 }
