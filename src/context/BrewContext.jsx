@@ -52,7 +52,7 @@ export function BrewProvider({ children }) {
     syncingRef.current = true
     try {
       await flushOutbox(supabase, cache, userId)
-      await pullRemote(supabase, cache, userId)
+      await pullRemote(supabase, cache)
       await hydrate(cache)
     } finally {
       syncingRef.current = false
@@ -65,6 +65,9 @@ export function BrewProvider({ children }) {
     for (const url of urlsRef.current.values()) URL.revokeObjectURL(url)
     urlsRef.current = new Map()
     cacheRef.current = null
+    // Intentional reset when the signed-in user changes, so one account's
+    // entries never flash while the next account's cache loads.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries([])
 
     if (!userId) return
@@ -86,7 +89,7 @@ export function BrewProvider({ children }) {
       window.removeEventListener('online', onWake)
       window.removeEventListener('focus', onWake)
     }
-  }) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
   async function addEntry({ type, name, photo, rating, notes, color }) {
     const cache = cacheRef.current

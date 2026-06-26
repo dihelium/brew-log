@@ -75,8 +75,9 @@ export async function flushOutbox(supabase, cache, userId) {
  * pullRemote — fetch the user's rows, update the entries cache, and download
  * any photo blobs not already cached. Rows with a pending local delete are
  * skipped so a just-deleted entry doesn't reappear before its delete syncs.
+ * RLS scopes the query to the signed-in user, so no userId argument is needed.
  */
-export async function pullRemote(supabase, cache, userId) {
+export async function pullRemote(supabase, cache) {
   const { data, error } = await supabase
     .from('entries')
     .select('*')
