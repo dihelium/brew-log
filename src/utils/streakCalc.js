@@ -21,7 +21,7 @@ export function calcPhotoStreak(entries) {
       continue
     }
 
-    const allPhotographed = dayEntries.every(e => !!e.photo)
+    const allPhotographed = dayEntries.every(e => !!e.hasPhoto)
     if (allPhotographed) {
       streak++
       cursor.setDate(cursor.getDate() - 1)

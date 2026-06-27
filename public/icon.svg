@@ -2,27 +2,33 @@
   <rect width="512" height="512" rx="112" fill="#3d2b1f"/>
   <defs>
     <clipPath id="cup-body">
-      <rect x="152" y="210" width="208" height="175" rx="24"/>
+      <rect x="116" y="182" width="280" height="226" rx="30"/>
     </clipPath>
   </defs>
-  <!-- whole cup shifted left so the entire artwork (incl. handle) is centered -->
-  <g transform="translate(-38 0)">
-    <!-- handle -->
-    <path d="M360 248 h44 a44 44 0 0 1 0 88 h-44" stroke="#c97b3a" stroke-width="26" fill="none" stroke-linecap="round"/>
-    <!-- layered cup body: three coffee-tone bands clipped to the rounded mug -->
+  <!--
+    Self-balancing composition: do NOT add centering transforms.
+    Compact handle (small right overhang) + steam drifting left
+    counterweight each other; the translate is baked in and final
+    (-10 x optical balance, -28 y so the mug body centre sits near
+    the canvas centre instead of the steam pushing it low).
+    Bands: matcha / milk / espresso — the app logs both drinks.
+  -->
+  <g transform="translate(-10 -28)">
+    <!-- compact D-handle tucked against the body -->
+    <path d="M394 246 a45 45 0 0 1 0 90" stroke="#c97b3a" stroke-width="30" fill="none" stroke-linecap="round"/>
+    <!-- layered cup body: matcha, milk, espresso -->
     <g clip-path="url(#cup-body)">
-      <rect x="152" y="210" width="208" height="59" fill="#e8c79a"/>
-      <rect x="152" y="269" width="208" height="58" fill="#c97b3a"/>
-      <rect x="152" y="327" width="208" height="58" fill="#6f4423"/>
-      <!-- subtle band separators -->
-      <line x1="152" y1="269" x2="360" y2="269" stroke="#3d2b1f" stroke-width="3" stroke-opacity="0.22"/>
-      <line x1="152" y1="327" x2="360" y2="327" stroke="#3d2b1f" stroke-width="3" stroke-opacity="0.22"/>
+      <rect x="116" y="182" width="280" height="75" fill="#8b9d5d"/>
+      <rect x="116" y="257" width="280" height="75" fill="#e8c79a"/>
+      <rect x="116" y="332" width="280" height="76" fill="#6f4423"/>
+      <line x1="116" y1="257" x2="396" y2="257" stroke="#3d2b1f" stroke-width="3" stroke-opacity="0.22"/>
+      <line x1="116" y1="332" x2="396" y2="332" stroke="#3d2b1f" stroke-width="3" stroke-opacity="0.22"/>
     </g>
     <!-- saucer -->
-    <rect x="126" y="400" width="260" height="22" rx="11" fill="#c97b3a"/>
-    <!-- steam -->
-    <path d="M208 170 q14-28 0-52" stroke="#faf7f2" stroke-width="14" fill="none" stroke-linecap="round"/>
-    <path d="M256 158 q14-28 0-52" stroke="#faf7f2" stroke-width="14" fill="none" stroke-linecap="round"/>
-    <path d="M304 170 q14-28 0-52" stroke="#faf7f2" stroke-width="14" fill="none" stroke-linecap="round"/>
+    <rect x="87" y="422" width="338" height="26" rx="13" fill="#c97b3a"/>
+    <!-- short steam wisps, drifting left to counterweight the handle -->
+    <path d="M200 164 q-13 -24 0 -46" stroke="#faf7f2" stroke-width="16" fill="none" stroke-linecap="round"/>
+    <path d="M250 153 q-13 -24 0 -46" stroke="#faf7f2" stroke-width="16" fill="none" stroke-linecap="round"/>
+    <path d="M300 164 q-13 -24 0 -46" stroke="#faf7f2" stroke-width="16" fill="none" stroke-linecap="round"/>
   </g>
 </svg>
