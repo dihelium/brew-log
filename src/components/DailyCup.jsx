@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import mugPhoto from '../assets/mug.png'
 
 const FALLBACK  = '#c97b3a'
-const MAX_BREWS = 3
+const MAX_BREWS = 10
 const CUP_TOP   = 132
 const CUP_BOT   = 348
 const CUP_H     = 216   // CUP_BOT - CUP_TOP
@@ -27,8 +27,9 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
   // Reset to cross-section view whenever brew count changes
   useEffect(() => { setShowPhoto(false) }, [todayEntries.length])
 
-  // Fill geometry
-  const fillH  = n === 0 ? 0 : Math.round((n / MAX_BREWS) * CUP_H)
+  // Fill geometry — liquid always fills the whole mug; each brew takes an
+  // equal horizontal band, so 1 brew = full colour, 2 = half/half, n = n bands.
+  const fillH  = n === 0 ? 0 : CUP_H
   const fillY  = CUP_BOT - fillH
   const bandH  = n > 0 ? fillH / n : 0
 
