@@ -4,6 +4,7 @@ import { useBrew } from '../context/BrewContext'
 import EntryCard from '../components/EntryCard'
 import DailyCup from '../components/DailyCup'
 import BackupControls from '../components/BackupControls'
+import ThemePicker from '../components/ThemePicker'
 import { calcPhotoStreak } from '../utils/streakCalc'
 
 export default function FeedPage() {
@@ -42,6 +43,7 @@ export default function FeedPage() {
         </div>
       )}
 
+      <ThemePicker />
       <BackupControls />
 
       <motion.button

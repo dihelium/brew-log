@@ -2,6 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { applyTheme, getStoredTheme } from './lib/theme'
+
+// Apply the saved theme before the first render so the app never
+// paints in the wrong palette.
+applyTheme(getStoredTheme())
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
