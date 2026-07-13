@@ -11,7 +11,7 @@ export default function StarRating({ value = 0, onChange, readOnly = false }) {
           onClick={() => !readOnly && onChange(i + 1)}
           style={{
             fontSize: readOnly ? '18px' : '24px',
-            color: i < value ? 'var(--accent-coffee)' : 'var(--border-strong)',
+            color: i < value ? 'var(--accent-primary)' : 'var(--border-strong)',
             background: 'none',
             border: 'none',
             cursor: readOnly ? 'default' : 'pointer',
