@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import mugPhoto from '../assets/mug.png'
 
 const FALLBACK  = '#c97b3a'
 const MAX_BREWS = 10
-const CUP_TOP   = 132
 const CUP_BOT   = 348
-const CUP_H     = 216   // CUP_BOT - CUP_TOP
+const CUP_H     = 216   // CUP_BOT - cup top (y=132)
 
 function wave(y, amp, reps = 5, period = 160) {
   let d = `M ${-reps * period},${y}`
@@ -24,8 +23,14 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
   const filled = todayEntries.length > 0
   const n      = Math.min(todayEntries.length, MAX_BREWS)
 
-  // Reset to cross-section view whenever brew count changes
-  useEffect(() => { setShowPhoto(false) }, [todayEntries.length])
+  // Reset to cross-section view whenever brew count changes — state is
+  // adjusted during render (not in an effect) so there is no extra pass
+  // with the stale view: https://react.dev/learn/you-might-not-need-an-effect
+  const [prevCount, setPrevCount] = useState(todayEntries.length)
+  if (prevCount !== todayEntries.length) {
+    setPrevCount(todayEntries.length)
+    setShowPhoto(false)
+  }
 
   // Fill geometry — liquid always fills the whole mug; each brew takes an
   // equal horizontal band, so 1 brew = full colour, 2 = half/half, n = n bands.
