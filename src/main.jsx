@@ -20,6 +20,16 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').catch(() => {})
     })
+    // When an updated worker takes control, the page is now served by the new
+    // worker (which no longer caches Supabase reads). Trigger one resync via the
+    // existing wake path so fresh data loads immediately — without a reload that
+    // would discard an in-progress add/edit draft held only in React state.
+    let resynced = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (resynced) return
+      resynced = true
+      window.dispatchEvent(new Event('online'))
+    })
   } else {
     // Dev: a previously-registered SW serves stale cached modules on reload
     // (cache-first), hiding code changes. Unregister it and clear its caches.

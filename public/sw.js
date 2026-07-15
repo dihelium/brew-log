@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brew-log-v1'
+const CACHE_NAME = 'brew-log-v2'
 
 const SHELL = [
   '/',
@@ -26,6 +26,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
+
+  // Never let the service worker cache Supabase requests. A cache-first hit
+  // here once served a stale entries response indefinitely, hiding new server
+  // data. Let the browser fetch them directly so reads are always fresh.
+  // (Same-origin app assets and Google Fonts keep their cache-first behavior.)
+  if (new URL(e.request.url).hostname.endsWith('.supabase.co')) return
 
   if (e.request.mode === 'navigate') {
     e.respondWith(

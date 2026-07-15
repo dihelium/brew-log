@@ -9,7 +9,7 @@ This is the architectural single source of truth for my-brew-log, read at the st
 my-brew-log is an **offline-first PWA** for logging coffee/matcha/tea intake, designed to be installed on an iPhone home screen. Entries (name, type, rating, notes, photo, extracted color) are stored locally in IndexedDB and synced to Supabase when online. A no-sign-in demo mode uses the same local stack with a synthetic user and seeded entries, but never syncs. A layered "daily cup" visualization, photo streaks, and switchable themes make up the personality of the app.
 
 - **Project type**: Web Frontend (React SPA / PWA) with a Supabase backend-as-a-service
-- **Current version**: 0.4.0 (`package.json`)
+- **Current version**: 0.4.1 (`package.json`)
 - **Deployment**: Vercel (static SPA with rewrite-to-index), service worker for offline
 
 ## 3. Technology Stack
@@ -131,7 +131,7 @@ For the July account-consolidation recovery, read the iPhone's displayed account
 - Photos are compressed client-side (`compressImage`) before caching/upload.
 - Theme applied pre-render to avoid palette flash; fonts lazy-loaded per theme.
 - Demo photos stay in the dynamically imported `demoData.js` chunk; the service worker's runtime GET caching retains that chunk after an online demo load.
-- Service worker caches the built app for offline start (`public/sw.js`); dev mode actively unregisters SWs to avoid stale-module traps.
+- Service worker caches the built app for offline start (`public/sw.js`, cache `brew-log-v2`); dev mode actively unregisters SWs to avoid stale-module traps. The SW **never caches Supabase requests** (`*.supabase.co` is bypassed to the network) — a prior cache-first hit served a stale entries response indefinitely and hid new server data; only same-origin app assets and Google Fonts are cached. On SW update, `main.jsx` listens for `controllerchange` and triggers one resync (via the `online` wake event) so fresh data loads under the new worker without a page reload.
 
 ## 12. Deployment
 

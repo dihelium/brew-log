@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message                  |
 | ------- | ---- | ------------------------------- |
+| `0.4.1` | 1    | fix: service worker no longer caches Supabase reads (stale-data bug) |
 | `0.4.0` | 1    | fix: resilient outbox sync, sync-error visibility, and account clarity |
 | `0.3.0` | 1    | feat: no-sign-in demo mode with seeded local brews |
 | `0.2.0` | 1    | feat: editable brew fields (date/rating/notes/name/type), tea type, and calendar view |
@@ -11,6 +12,10 @@
 ---
 
 # Changelog Summary
+
+- **v0.4.1 (SW Stop Caching Supabase Reads - Week 1, 16-07-2026)**:
+  - **Fix**: the service worker (`public/sw.js`) cache-first strategy was caching the cross-origin Supabase entries API response, serving a stale row set indefinitely — so devices never saw new server data (writes are POST/PATCH and passed through). Now the SW bypasses its cache for `*.supabase.co` (always network); same-origin assets and Google Fonts stay cached. `CACHE_NAME` → `brew-log-v2` purges the poison.
+  - **Rollout**: `src/main.jsx` triggers a one-time resync on `controllerchange` (via the existing wake path) so fresh data loads under the new worker without a page reload (preserving in-progress drafts). No schema/sync-logic changes; verification is post-deploy (no SW harness).
 
 - **v0.4.0 (Sync Resilience & Account Clarity - Week 1, 15-07-2026)**:
   - **Fix**: resilient `flushOutbox` — a failing outbox op no longer freezes all sync; it blocks only that entry's later ops (preserving causal order) while other entries flush, and failed ops retry next pass. Returns `{ ok, flushed, failed, cleanupFailed, error }`.
