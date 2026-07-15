@@ -3,7 +3,7 @@ import { useAuth } from './AuthContext'
 import { supabase } from '../lib/supabase'
 import { createCache } from '../lib/cache'
 import { dataUrlToBlob, blobToDataUrl } from '../lib/photoCodec'
-import { flushOutbox, pullRemote } from '../lib/sync'
+import { applyPatch, flushOutbox, normalizePatch, pullRemote } from '../lib/sync'
 
 const BrewContext = createContext(null)
 
@@ -140,29 +140,23 @@ export function BrewProvider({ children }) {
     runSync()
   }
 
-  // Update the currently supported patch fields. The patch shape is kept
-  // extensible for future metadata, while location is the only accepted key
-  // today. Cleared optional fields stay absent in the cache and become null
-  // in the remote row through the update outbox operation.
+  // Cleared optional fields stay absent in the cache and become null in the
+  // remote row through the update outbox operation.
   async function updateEntry(id, patch) {
     const cache = cacheRef.current
-    if (!cache || !patch || !Object.prototype.hasOwnProperty.call(patch, 'location')) return
+    if (!cache) return
+    const normalized = normalizePatch(patch)
+    if (Object.keys(normalized).length === 0) return
     const existing = await cache.getEntry(id)
     if (!existing) return
 
-    const location = typeof patch.location === 'string' ? patch.location.trim() : null
-    const nextEntry = { ...existing }
-    if (location) nextEntry.location = location
-    else delete nextEntry.location
+    const nextEntry = applyPatch(existing, normalized)
 
     await cache.putEntry(nextEntry)
-    await cache.enqueue('update', { id, patch: { location: location || null } })
-    setEntries(prev => prev.map(entry => {
-      if (entry.id !== id) return entry
-      const updated = { ...entry, ...nextEntry }
-      if (!nextEntry.location) delete updated.location
-      return updated
-    }))
+    await cache.enqueue('update', { id, patch: normalized })
+    setEntries(prev => prev
+      .map(entry => entry.id === id ? applyPatch(entry, normalized) : entry)
+      .sort((a, b) => b.timestamp - a.timestamp))
     runSync()
   }
 

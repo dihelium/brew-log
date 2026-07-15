@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { flushOutbox, pullRemote, toRow, fromRow, toPatchRow, applyPatch } from './sync'
+import {
+  applyPatch,
+  flushOutbox,
+  fromRow,
+  normalizePatch,
+  pullRemote,
+  toPatchRow,
+  toRow,
+} from './sync'
 
 // Minimal in-memory cache implementing the methods sync uses.
 function memCache() {
@@ -81,8 +89,65 @@ describe('toPatchRow', () => {
   })
 
   it('ignores unknown keys', () => {
-    expect(toPatchRow({ photo_path: 'x', name: 'Y' })).toEqual({})
+    expect(toPatchRow({ photo_path: 'x' })).toEqual({})
     expect(toPatchRow()).toEqual({})
+  })
+
+  it('maps all editable fields to their remote columns', () => {
+    expect(toPatchRow({
+      name: 'Tea',
+      type: 'tea',
+      rating: 5,
+      notes: 'bright',
+      location: 'office',
+      timestamp: 1000,
+    })).toEqual({
+      name: 'Tea',
+      type: 'tea',
+      rating: 5,
+      notes: 'bright',
+      location: 'office',
+      logged_at: new Date(1000).toISOString(),
+    })
+  })
+
+  it('maps rating and nullable fields for clearing', () => {
+    expect(toPatchRow({ type: null, rating: null, notes: null, location: null }))
+      .toEqual({ type: null, rating: null, notes: null, location: null })
+  })
+})
+
+describe('normalizePatch', () => {
+  it('trims editable strings and keeps canonical values', () => {
+    expect(normalizePatch({
+      name: '  Tea  ',
+      type: 'tea',
+      rating: '4',
+      notes: '  floral  ',
+      location: '  office  ',
+      timestamp: 1000,
+      unknown: 'drop me',
+    })).toEqual({
+      name: 'Tea',
+      type: 'tea',
+      rating: 4,
+      notes: 'floral',
+      location: 'office',
+      timestamp: 1000,
+    })
+  })
+
+  it('drops empty names, invalid timestamps, and unknown fields', () => {
+    expect(normalizePatch({
+      name: '   ',
+      rating: 0,
+      notes: '',
+      location: '',
+      timestamp: Infinity,
+      photo_path: 'ignored',
+    })).toEqual({ rating: null, notes: null, location: null })
+    expect(normalizePatch({ name: null })).toEqual({})
+    expect(normalizePatch({ rating: '0' })).toEqual({ rating: null })
   })
 })
 
@@ -91,6 +156,19 @@ describe('applyPatch', () => {
     expect(applyPatch({ id: 'a', location: 'old' }, { location: 'new' }).location).toBe('new')
     expect('location' in applyPatch({ id: 'a', location: 'old' }, { location: null })).toBe(false)
     expect(applyPatch({ id: 'a', location: 'old' })).toEqual({ id: 'a', location: 'old' })
+  })
+
+  it('updates and clears the expanded editable fields', () => {
+    const entry = {
+      id: 'a', name: 'Old', type: 'coffee', rating: 3, notes: 'old',
+      location: 'home', timestamp: 1,
+    }
+    expect(applyPatch(entry, {
+      name: 'New', type: 'tea', rating: 5, notes: 'new', location: null, timestamp: 2,
+    })).toEqual({ id: 'a', name: 'New', type: 'tea', rating: 5, notes: 'new', timestamp: 2 })
+    expect(applyPatch(entry, { type: null, rating: null, notes: null })).toEqual({
+      id: 'a', name: 'Old', type: null, location: 'home', timestamp: 1,
+    })
   })
 })
 
@@ -139,6 +217,20 @@ describe('flushOutbox', () => {
     const res = await flushOutbox(fakeSb, c, 'u1')
     expect(res.ok).toBe(false)
     expect(await c.allOps()).toHaveLength(1)
+  })
+
+  it('drops an update for a remotely deleted row and the following pull prunes local state', async () => {
+    fakeSb = okSupabase([])
+    const c = memCache()
+    await c.putEntry({ id: 'gone', name: 'Old', timestamp: 1, hasPhoto: false })
+    await c.enqueue('update', { id: 'gone', patch: { name: 'New' } })
+
+    const flushed = await flushOutbox(fakeSb, c, 'u1')
+    expect(flushed.ok).toBe(true)
+    expect(await c.allOps()).toHaveLength(0)
+
+    await pullRemote(fakeSb, c)
+    expect(await c.getEntry('gone')).toBeUndefined()
   })
 
   it('removes the deterministic photo path on delete when only hasPhoto is known', async () => {

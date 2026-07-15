@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import StarRating from './StarRating'
+import { brewTypeLabel } from '../utils/brewTypes'
 
 function formatTime(ts) {
   const d = new Date(ts)
@@ -34,7 +35,7 @@ export default function EntryCard({ entry, index = 0 }) {
         <p className="entry-card__name">{entry.name}</p>
         <div className="entry-card__meta">
           <span className="entry-card__badge" data-type={entry.type}>
-            {entry.type === 'coffee' ? 'Coffee' : 'Matcha'}
+            {brewTypeLabel(entry.type)}
           </span>
           <span className="entry-card__time">{formatTime(entry.timestamp)}</span>
           {entry.location && (

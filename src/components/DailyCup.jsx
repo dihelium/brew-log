@@ -17,7 +17,7 @@ function wave(y, amp, reps = 5, period = 160) {
   return d
 }
 
-export default function DailyCup({ todayEntries = [], streak = 0 }) {
+export default function DailyCup({ todayEntries = [], streak = 0, historical = false }) {
   const [showPhoto, setShowPhoto] = useState(false)
 
   const filled = todayEntries.length > 0
@@ -223,11 +223,15 @@ export default function DailyCup({ todayEntries = [], streak = 0 }) {
         marginTop:  filled ? 2 : 8,
         fontFamily: 'var(--font-body)',
       }}>
-        {filled
-          ? todayEntries.length === 1
-            ? "today's brew"
-            : `${todayEntries.length} brews today`
-          : 'nothing logged yet today'
+        {historical
+          ? filled
+            ? todayEntries.length === 1 ? '1 brew' : `${todayEntries.length} brews`
+            : 'nothing logged'
+          : filled
+            ? todayEntries.length === 1
+              ? "today's brew"
+              : `${todayEntries.length} brews today`
+            : 'nothing logged yet today'
         }
       </p>
 

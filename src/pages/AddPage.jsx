@@ -8,6 +8,7 @@ import ColorPicker from '../components/ColorPicker'
 import LocationField from '../components/LocationField'
 import { playDrop } from '../utils/dropSound'
 import { recentLocations } from '../utils/recentLocations'
+import { BREW_TYPES } from '../utils/brewTypes'
 
 export default function AddPage() {
   const navigate = useNavigate()
@@ -63,15 +64,15 @@ export default function AddPage() {
           <div>
             <label className="sheet__label">Type</label>
             <div style={{ display: 'flex', gap: 10 }}>
-              {['coffee', 'matcha'].map(t => (
+              {BREW_TYPES.map(({ id, label, emoji }) => (
                 <button
-                  key={t}
+                  key={id}
                   type="button"
-                  onClick={() => setType(t)}
+                  onClick={() => setType(id)}
                   className="sheet__type-btn"
-                  data-active={type === t}
+                  data-active={type === id}
                 >
-                  {t === 'coffee' ? '☕' : '🍵'} {t === 'coffee' ? 'Coffee' : 'Matcha'}
+                  {emoji} {label}
                 </button>
               ))}
             </div>

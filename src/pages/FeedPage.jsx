@@ -25,7 +25,18 @@ export default function FeedPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
-      <h1 className="feed-page__heading">my brew log</h1>
+      <div className="feed-page__heading-row">
+        <span aria-hidden="true" />
+        <h1 className="feed-page__heading">my brew log</h1>
+        <button
+          type="button"
+          className="feed-page__calendar-btn"
+          onClick={() => navigate('/calendar')}
+          aria-label="Open calendar"
+        >
+          🗓
+        </button>
+      </div>
 
       <DailyCup todayEntries={todayEntries} streak={streak} />
 

@@ -5,6 +5,7 @@ import { BrewProvider } from './context/BrewContext'
 import FeedPage from './pages/FeedPage'
 import AddPage from './pages/AddPage'
 import DetailPage from './pages/DetailPage'
+import CalendarPage from './pages/CalendarPage'
 import LoginPage from './pages/LoginPage'
 
 function AnimatedRoutes() {
@@ -21,6 +22,7 @@ function AnimatedRoutes() {
           </>
         } />
         <Route path="/entry/:id" element={<DetailPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
       </Routes>
     </AnimatePresence>
   )

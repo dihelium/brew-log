@@ -38,13 +38,63 @@ export function fromRow(row) {
 }
 
 /**
- * toPatchRow — map the currently supported client patch fields to columns.
- * Empty location values clear the nullable column; unknown keys are ignored.
+ * normalizePatch — produce a canonical patch for the supported editable
+ * client fields. Unknown fields and invalid values are dropped.
+ */
+export function normalizePatch(patch = {}) {
+  const normalized = {}
+  if (!patch || typeof patch !== 'object') return normalized
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'name')) {
+    const name = String(patch.name ?? '').trim()
+    if (name) normalized.name = name
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'type')) {
+    normalized.type = patch.type
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'rating')) {
+    const rating = Number(patch.rating)
+    if (!patch.rating || rating === 0) {
+      normalized.rating = null
+    } else if (Number.isFinite(rating) && rating >= 1 && rating <= 5) normalized.rating = rating
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+    const notes = typeof patch.notes === 'string' ? patch.notes.trim() : ''
+    normalized.notes = notes || null
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
+    const location = typeof patch.location === 'string' ? patch.location.trim() : ''
+    normalized.location = location || null
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'timestamp') && Number.isFinite(patch.timestamp)) {
+    normalized.timestamp = patch.timestamp
+  }
+  return normalized
+}
+
+/**
+ * toPatchRow — map canonical client patch fields to Supabase columns.
+ * Empty nullable values clear their columns; absent keys never touch a column.
  */
 export function toPatchRow(patch = {}) {
   const row = {}
+  if (Object.prototype.hasOwnProperty.call(patch, 'name')) {
+    row.name = patch.name
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'type')) {
+    row.type = patch.type
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'rating')) {
+    row.rating = patch.rating ?? null
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+    row.notes = patch.notes || null
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
     row.location = patch.location || null
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'timestamp')) {
+    row.logged_at = new Date(patch.timestamp).toISOString()
   }
   return row
 }
@@ -55,9 +105,26 @@ export function toPatchRow(patch = {}) {
  */
 export function applyPatch(entry, patch = {}) {
   const next = { ...entry }
+  if (Object.prototype.hasOwnProperty.call(patch, 'name')) {
+    next.name = patch.name
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'type')) {
+    next.type = patch.type ?? null
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'rating')) {
+    if (patch.rating) next.rating = patch.rating
+    else delete next.rating
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+    if (patch.notes) next.notes = patch.notes
+    else delete next.notes
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
     if (patch.location) next.location = patch.location
     else delete next.location
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'timestamp')) {
+    next.timestamp = patch.timestamp
   }
   return next
 }
@@ -65,7 +132,8 @@ export function applyPatch(entry, patch = {}) {
 /**
  * flushOutbox — replay queued ops in order. Stops on the first failure and
  * leaves the failing op (and the rest) in the outbox for a later retry.
- * Upserts/deletes keyed by the client UUID are idempotent, so retries are safe.
+ * Upserts and update-by-id/deletes keyed by the client UUID are idempotent, so
+ * retries are safe.
  */
 export async function flushOutbox(supabase, cache, userId) {
   const ops = await cache.allOps()

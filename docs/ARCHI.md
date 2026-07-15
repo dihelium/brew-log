@@ -9,7 +9,7 @@ This is the architectural single source of truth for my-brew-log, read at the st
 my-brew-log is an **offline-first PWA** for logging coffee/matcha/tea intake, designed to be installed on an iPhone home screen. Entries (name, type, rating, notes, photo, extracted color) are stored locally in IndexedDB and synced to Supabase when online. A layered "daily cup" visualization, photo streaks, and switchable themes make up the personality of the app.
 
 - **Project type**: Web Frontend (React SPA / PWA) with a Supabase backend-as-a-service
-- **Current version**: 0.1.0 (`package.json`)
+- **Current version**: 0.2.0 (`package.json`)
 - **Deployment**: Vercel (static SPA with rewrite-to-index), service worker for offline
 
 ## 3. Technology Stack
@@ -34,9 +34,10 @@ src/
 ├── App.jsx               # Providers (Auth, Brew) + AnimatePresence routes
 ├── index.css             # Global styles, theme CSS variable blocks
 ├── pages/
-│   ├── FeedPage.jsx      # "/" — DailyCup, streak chip, entry list
+│   ├── FeedPage.jsx      # "/" — DailyCup, streak chip, entry list, calendar link
 │   ├── AddPage.jsx       # "/add" — new entry form, photo + color picker
-│   ├── DetailPage.jsx    # "/entry/:id"
+│   ├── DetailPage.jsx    # "/entry/:id" — inline per-field editing
+│   ├── CalendarPage.jsx  # "/calendar" — month grid (brew-day dots), day list + day mug
 │   └── LoginPage.jsx     # Google OAuth sign-in
 ├── components/           # DailyCup, EntryCard, StarRating, PhotoPicker, ColorPicker, ThemePicker, BackupControls, LocationField
 ├── context/
@@ -48,13 +49,13 @@ src/
 │   ├── sync.js           # toRow/fromRow mapping, partial updates, flushOutbox, pullRemote
 │   ├── photoCodec.js     # dataURL <-> Blob (Node-compatible for tests)
 │   └── theme.js          # Five-theme table, persistence (localStorage brewlog:theme), DOM application
-└── utils/                # compressImage, extractColor, recentLocations, streakCalc, dropSound
+└── utils/                # compressImage, extractColor, recentLocations, streakCalc, dropSound, brewTypes, calendar, datetimeLocal
 ```
 
 ## 5. Core Architecture Principles
 
 - **Offline-first**: all reads/writes hit IndexedDB first; the UI never blocks on the network.
-- **Outbox pattern**: mutations append `{ seq, op, entry }` to an ordered `outbox` store; `flushOutbox` replays `add`, text-only partial `update`, and `delete` operations against Supabase when connectivity/auth allows, while `pullRemote` reconciles remote rows back into the cache. Update operations never touch photo storage or `photo_path`. Pending update patches are overlaid on pulled rows, and a sync requested during an active pass queues one follow-up pass, so edits made mid-sync are neither reverted nor stranded.
+- **Outbox pattern**: mutations append `{ seq, op, entry }` to an ordered `outbox` store; `flushOutbox` replays `add`, whitelisted partial `update`, and `delete` operations against Supabase when connectivity/auth allows, while `pullRemote` reconciles remote rows back into the cache. The `update` op carries a canonical patch over a fixed set of editable client fields (`name`, `type`, `rating`, `notes`, `timestamp`, `location`), normalized by `normalizePatch` and mapped symmetrically by `toPatchRow`/`applyPatch` — it never touches photo storage or `photo_path`. Pending update patches are overlaid on pulled rows, and a sync requested during an active pass queues one follow-up pass, so edits made mid-sync are neither reverted nor stranded. A row deleted on another device wins over a local edit (delete-wins): the `update` matches zero rows, the op is dropped, and the next pull prunes the local entry.
 - **Per-user isolation**: IndexedDB database name is `brew-log-<userId>`; switching accounts switches databases.
 - **Context over state libraries**: `AuthContext` and `BrewContext` are the only global state; no Redux/Zustand.
 - **Plain JS + JSDoc**: no TypeScript; validation is runtime (`isValidEntry`).
