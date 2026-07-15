@@ -12,6 +12,7 @@ export function toRow(entry, userId, photoPath) {
     rating: entry.rating ?? null,
     notes: entry.notes ?? null,
     color: entry.color ?? null,
+    location: entry.location ?? null,
     photo_path: photoPath ?? null,
     logged_at: new Date(entry.timestamp).toISOString(),
   }
@@ -32,7 +33,33 @@ export function fromRow(row) {
     ...(row.rating != null && { rating: row.rating }),
     ...(row.notes != null && { notes: row.notes }),
     ...(row.color != null && { color: row.color }),
+    ...(row.location != null && { location: row.location }),
   }
+}
+
+/**
+ * toPatchRow — map the currently supported client patch fields to columns.
+ * Empty location values clear the nullable column; unknown keys are ignored.
+ */
+export function toPatchRow(patch = {}) {
+  const row = {}
+  if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
+    row.location = patch.location || null
+  }
+  return row
+}
+
+/**
+ * applyPatch — overlay a pending update patch on a client entry, mirroring
+ * toPatchRow: cleared values remove the optional field instead of nulling it.
+ */
+export function applyPatch(entry, patch = {}) {
+  const next = { ...entry }
+  if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
+    if (patch.location) next.location = patch.location
+    else delete next.location
+  }
+  return next
 }
 
 /**
@@ -55,6 +82,12 @@ export async function flushOutbox(supabase, cache, userId) {
           if (error) throw error
         }
         const { error } = await supabase.from('entries').upsert(toRow(item.entry, userId, photoPath))
+        if (error) throw error
+      } else if (item.op === 'update') {
+        const { error } = await supabase
+          .from('entries')
+          .update(toPatchRow(item.entry.patch))
+          .eq('id', item.entry.id)
         if (error) throw error
       } else if (item.op === 'delete') {
         const { error } = await supabase.from('entries').delete().eq('id', item.entry.id)
@@ -79,7 +112,9 @@ export async function flushOutbox(supabase, cache, userId) {
 /**
  * pullRemote — fetch the user's rows, update the entries cache, and download
  * any photo blobs not already cached. Rows with a pending local delete are
- * skipped so a just-deleted entry doesn't reappear before its delete syncs.
+ * skipped so a just-deleted entry doesn't reappear before its delete syncs,
+ * and pending update patches are overlaid so an edit enqueued during a sync
+ * pass isn't reverted by the stale remote row.
  * Local entries absent from the server (deleted on another device) are pruned,
  * unless they're still waiting to upload locally (pending add).
  * RLS scopes the query to the signed-in user, so no userId argument is needed.
@@ -94,6 +129,11 @@ export async function pullRemote(supabase, cache) {
   const ops = await cache.allOps()
   const pendingDeletes = new Set(ops.filter(o => o.op === 'delete').map(o => o.entry.id))
   const pendingAdds = new Set(ops.filter(o => o.op === 'add').map(o => o.entry.id))
+  const pendingPatches = new Map()
+  for (const o of ops) {
+    if (o.op !== 'update') continue
+    pendingPatches.set(o.entry.id, { ...pendingPatches.get(o.entry.id), ...o.entry.patch })
+  }
   const serverIds = new Set(data.map(r => r.id))
 
   // Prune entries that were deleted on another device. Keep un-synced local
@@ -107,7 +147,7 @@ export async function pullRemote(supabase, cache) {
 
   for (const row of data) {
     if (pendingDeletes.has(row.id)) continue
-    await cache.putEntry(fromRow(row))
+    await cache.putEntry(applyPatch(fromRow(row), pendingPatches.get(row.id)))
     if (row.photo_path && !(await cache.getPhotoBlob(row.id))) {
       const { data: blob } = await supabase.storage.from(BUCKET).download(row.photo_path)
       if (blob) await cache.putPhotoBlob(row.id, blob)

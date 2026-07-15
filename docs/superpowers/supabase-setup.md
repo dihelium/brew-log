@@ -13,6 +13,7 @@ create table public.entries (
   rating int,
   notes text,
   color text,
+  location text,
   photo_path text,
   logged_at timestamptz not null,
   created_at timestamptz not null default now()

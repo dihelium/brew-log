@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import StarRating from '../components/StarRating'
+import LocationField from '../components/LocationField'
+import { recentLocations } from '../utils/recentLocations'
 
 function formatDate(ts) {
   return new Date(ts).toLocaleString([], {
@@ -14,8 +16,11 @@ function formatDate(ts) {
 export default function DetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { entries, deleteEntry } = useBrew()
+  const { entries, deleteEntry, updateEntry } = useBrew()
   const [confirming, setConfirming] = useState(false)
+  const [editingLocation, setEditingLocation] = useState(false)
+  const [locationDraft, setLocationDraft] = useState('')
+  const suggestions = useMemo(() => recentLocations(entries), [entries])
 
   const entry = entries.find(e => e.id === id)
 
@@ -43,6 +48,16 @@ export default function DetailPage() {
   function handleDelete() {
     deleteEntry(id)
     navigate('/')
+  }
+
+  function beginLocationEdit() {
+    setLocationDraft(entry.location ?? '')
+    setEditingLocation(true)
+  }
+
+  async function handleLocationSave() {
+    await updateEntry(id, { location: locationDraft.trim() })
+    setEditingLocation(false)
   }
 
   const isMatcha = entry.type === 'matcha'
@@ -84,6 +99,41 @@ export default function DetailPage() {
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
           {formatDate(entry.timestamp)}
         </div>
+
+        {editingLocation ? (
+          <div className="detail-location-edit">
+            <LocationField
+              value={locationDraft}
+              onChange={setLocationDraft}
+              suggestions={suggestions}
+            />
+            <div className="detail-location-actions">
+              <button
+                type="button"
+                className="detail-location-save"
+                onClick={handleLocationSave}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="detail-location-cancel"
+                onClick={() => setEditingLocation(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="detail-location-row"
+            data-empty={!entry.location}
+            onClick={beginLocationEdit}
+          >
+            {entry.location ? `📍 ${entry.location}` : 'Add location'}
+          </button>
+        )}
 
         {entry.rating > 0 && (
           <div style={{ marginBottom: 16 }}>

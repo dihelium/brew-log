@@ -208,6 +208,7 @@ button, input, textarea {
 .entry-card__body {
   padding: 12px 14px;
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -244,6 +245,16 @@ button, input, textarea {
 }
 
 .entry-card__time {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.entry-card__location {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -367,6 +378,34 @@ button, input, textarea {
   outline: none;
 }
 
+.location-field__suggestions {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0 2px;
+  scrollbar-width: thin;
+}
+
+.location-field__chip {
+  min-height: 40px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.location-field__chip:active,
+.location-field__chip:focus-visible {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--on-accent);
+}
+
 .sheet__textarea {
   resize: none;
 }
@@ -467,6 +506,56 @@ button, input, textarea {
 
 .detail-body {
   padding: 20px;
+}
+
+.detail-location-row {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.detail-location-row[data-empty="true"] {
+  color: var(--text-muted);
+}
+
+.detail-location-edit {
+  margin-bottom: 16px;
+}
+
+.detail-location-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.detail-location-save,
+.detail-location-cancel {
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.detail-location-save {
+  border: 1px solid var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--on-accent);
+}
+
+.detail-location-cancel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
 }
 
 .detail-notes {

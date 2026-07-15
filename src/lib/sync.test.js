@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { flushOutbox, pullRemote, toRow, fromRow } from './sync'
+import { flushOutbox, pullRemote, toRow, fromRow, toPatchRow, applyPatch } from './sync'
 
 // Minimal in-memory cache implementing the methods sync uses.
 function memCache() {
@@ -25,10 +25,11 @@ function memCache() {
 
 function okSupabase(rows = []) {
   return {
-    _uploads: [], _upserts: [], _deletes: [], _removes: [],
+    _uploads: [], _upserts: [], _updates: [], _deletes: [], _removes: [],
     from() {
       return {
         upsert: async (row) => { fakeSb._upserts.push(row); return { error: null } },
+        update(row) { return { eq: async (_c, id) => { fakeSb._updates.push({ id, row }); return { error: null } } } },
         select() { return { order: async () => ({ data: rows, error: null }) } },
         delete() { return { eq: async (_c, id) => { fakeSb._deletes.push(id); return { error: null } } } },
       }
@@ -58,6 +59,41 @@ describe('toRow/fromRow', () => {
   })
 })
 
+describe('location mapping', () => {
+  it('round-trips location through toRow/fromRow', () => {
+    const row = toRow({ id: 'a', name: 'X', timestamp: 1000, location: 'home' }, 'u1', null)
+    expect(row.location).toBe('home')
+    expect(fromRow(row).location).toBe('home')
+  })
+
+  it('omits location from the entry when the row has none', () => {
+    const row = toRow({ id: 'a', name: 'X', timestamp: 1000 }, 'u1', null)
+    expect(row.location).toBeNull()
+    expect('location' in fromRow(row)).toBe(false)
+  })
+})
+
+describe('toPatchRow', () => {
+  it('maps location and clears empty values to null', () => {
+    expect(toPatchRow({ location: 'office' })).toEqual({ location: 'office' })
+    expect(toPatchRow({ location: '' })).toEqual({ location: null })
+    expect(toPatchRow({ location: null })).toEqual({ location: null })
+  })
+
+  it('ignores unknown keys', () => {
+    expect(toPatchRow({ photo_path: 'x', name: 'Y' })).toEqual({})
+    expect(toPatchRow()).toEqual({})
+  })
+})
+
+describe('applyPatch', () => {
+  it('sets, clears, and leaves entries untouched to mirror toPatchRow', () => {
+    expect(applyPatch({ id: 'a', location: 'old' }, { location: 'new' }).location).toBe('new')
+    expect('location' in applyPatch({ id: 'a', location: 'old' }, { location: null })).toBe(false)
+    expect(applyPatch({ id: 'a', location: 'old' })).toEqual({ id: 'a', location: 'old' })
+  })
+})
+
 describe('flushOutbox', () => {
   it('uploads photo, upserts row, and clears the op', async () => {
     fakeSb = okSupabase()
@@ -76,6 +112,30 @@ describe('flushOutbox', () => {
     fakeSb.from = () => ({ upsert: async () => ({ error: { message: 'boom' } }) })
     const c = memCache()
     await c.enqueue('add', { id: 'a', name: 'X', timestamp: 1, hasPhoto: false })
+    const res = await flushOutbox(fakeSb, c, 'u1')
+    expect(res.ok).toBe(false)
+    expect(await c.allOps()).toHaveLength(1)
+  })
+
+  it('replays an update as a partial row update without touching storage', async () => {
+    fakeSb = okSupabase()
+    const c = memCache()
+    // Cached blob present: the update op must still never upload or write photo_path.
+    await c.putPhotoBlob('a', new Blob(['x'], { type: 'image/jpeg' }))
+    await c.enqueue('update', { id: 'a', patch: { location: 'home' } })
+    const res = await flushOutbox(fakeSb, c, 'u1')
+    expect(res.ok).toBe(true)
+    expect(fakeSb._updates).toEqual([{ id: 'a', row: { location: 'home' } }])
+    expect(fakeSb._uploads).toHaveLength(0)
+    expect(fakeSb._upserts).toHaveLength(0)
+    expect(await c.allOps()).toHaveLength(0)
+  })
+
+  it('retains an update op when the row update fails', async () => {
+    fakeSb = okSupabase()
+    fakeSb.from = () => ({ update: () => ({ eq: async () => ({ error: { message: 'boom' } }) }) })
+    const c = memCache()
+    await c.enqueue('update', { id: 'a', patch: { location: 'home' } })
     const res = await flushOutbox(fakeSb, c, 'u1')
     expect(res.ok).toBe(false)
     expect(await c.allOps()).toHaveLength(1)
@@ -130,6 +190,17 @@ describe('pullRemote', () => {
     await pullRemote(fakeSb, c)
     expect(await c.getEntry('gone')).toBeUndefined()
     expect(await c.getPhotoBlob('gone')).toBeUndefined()
+  })
+
+  it('overlays pending update patches so stale rows do not revert edits', async () => {
+    fakeSb = okSupabase([
+      { id: 'a', name: 'X', logged_at: new Date(1).toISOString(), photo_path: null, location: 'old place' },
+    ])
+    const c = memCache()
+    await c.putEntry({ id: 'a', name: 'X', timestamp: 1, hasPhoto: false, location: 'new place' })
+    await c.enqueue('update', { id: 'a', patch: { location: 'new place' } })
+    await pullRemote(fakeSb, c)
+    expect((await c.getEntry('a')).location).toBe('new place')
   })
 
   it('keeps un-synced local creates absent from the server', async () => {

@@ -37,6 +37,11 @@ export default function EntryCard({ entry, index = 0 }) {
             {entry.type === 'coffee' ? 'Coffee' : 'Matcha'}
           </span>
           <span className="entry-card__time">{formatTime(entry.timestamp)}</span>
+          {entry.location && (
+            <span className="entry-card__location">
+              📍 {entry.location}
+            </span>
+          )}
         </div>
         {entry.rating && <StarRating value={entry.rating} readOnly />}
       </div>

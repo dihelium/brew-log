@@ -25,6 +25,7 @@ export function BrewProvider({ children }) {
   const cacheRef = useRef(null)
   const urlsRef = useRef(new Map())   // entry id -> object URL
   const syncingRef = useRef(false)
+  const syncQueuedRef = useRef(false)
 
   // Build the UI entry list from cached rows, attaching object URLs for photos.
   async function hydrate(cache) {
@@ -57,12 +58,21 @@ export function BrewProvider({ children }) {
 
   async function runSync() {
     const cache = cacheRef.current
-    if (!cache || !userId || syncingRef.current) return
+    if (!cache || !userId) return
+    // A call during an active pass queues one follow-up pass, so a mutation
+    // enqueued after flushOutbox snapshotted the outbox still syncs promptly.
+    if (syncingRef.current) {
+      syncQueuedRef.current = true
+      return
+    }
     syncingRef.current = true
     try {
-      await flushOutbox(supabase, cache, userId)
-      await pullRemote(supabase, cache)
-      await hydrate(cache)
+      do {
+        syncQueuedRef.current = false
+        await flushOutbox(supabase, cache, userId)
+        await pullRemote(supabase, cache)
+        await hydrate(cache)
+      } while (syncQueuedRef.current)
     } finally {
       syncingRef.current = false
     }
@@ -100,7 +110,7 @@ export function BrewProvider({ children }) {
     }
   })
 
-  async function addEntry({ type, name, photo, rating, notes, color }) {
+  async function addEntry({ type, name, photo, rating, notes, color, location }) {
     const cache = cacheRef.current
     if (!cache) return
     const id = crypto.randomUUID()
@@ -114,6 +124,7 @@ export function BrewProvider({ children }) {
       ...(rating != null && { rating }),
       ...(notes != null && { notes }),
       ...(color != null && { color }),
+      ...(location != null && { location }),
     }
     let objectUrl = null
     if (photo) {
@@ -126,6 +137,32 @@ export function BrewProvider({ children }) {
     await cache.putEntry(entry)
     await cache.enqueue('add', entry)
     setEntries(prev => [{ ...entry, photo: objectUrl }, ...prev])
+    runSync()
+  }
+
+  // Update the currently supported patch fields. The patch shape is kept
+  // extensible for future metadata, while location is the only accepted key
+  // today. Cleared optional fields stay absent in the cache and become null
+  // in the remote row through the update outbox operation.
+  async function updateEntry(id, patch) {
+    const cache = cacheRef.current
+    if (!cache || !patch || !Object.prototype.hasOwnProperty.call(patch, 'location')) return
+    const existing = await cache.getEntry(id)
+    if (!existing) return
+
+    const location = typeof patch.location === 'string' ? patch.location.trim() : null
+    const nextEntry = { ...existing }
+    if (location) nextEntry.location = location
+    else delete nextEntry.location
+
+    await cache.putEntry(nextEntry)
+    await cache.enqueue('update', { id, patch: { location: location || null } })
+    setEntries(prev => prev.map(entry => {
+      if (entry.id !== id) return entry
+      const updated = { ...entry, ...nextEntry }
+      if (!nextEntry.location) delete updated.location
+      return updated
+    }))
     runSync()
   }
 
@@ -167,6 +204,7 @@ export function BrewProvider({ children }) {
         ...(r.rating != null && { rating: r.rating }),
         ...(r.notes != null && { notes: r.notes }),
         ...(r.color != null && { color: r.color }),
+        ...(r.location != null && { location: r.location }),
       }
       if (r.photo) {
         const blob = dataUrlToBlob(r.photo)
@@ -198,6 +236,7 @@ export function BrewProvider({ children }) {
         ...(row.rating != null && { rating: row.rating }),
         ...(row.notes != null && { notes: row.notes }),
         ...(row.color != null && { color: row.color }),
+        ...(row.location != null && { location: row.location }),
       }
       if (row.hasPhoto) {
         const blob = await cache.getPhotoBlob(row.id)
@@ -209,7 +248,7 @@ export function BrewProvider({ children }) {
   }
 
   return (
-    <BrewContext.Provider value={{ entries, addEntry, deleteEntry, importEntries, exportEntries }}>
+    <BrewContext.Provider value={{ entries, addEntry, updateEntry, deleteEntry, importEntries, exportEntries }}>
       {children}
     </BrewContext.Provider>
   )

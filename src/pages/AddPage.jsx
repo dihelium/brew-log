@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import StarRating from '../components/StarRating'
 import PhotoPicker from '../components/PhotoPicker'
 import ColorPicker from '../components/ColorPicker'
+import LocationField from '../components/LocationField'
 import { playDrop } from '../utils/dropSound'
+import { recentLocations } from '../utils/recentLocations'
 
 export default function AddPage() {
   const navigate = useNavigate()
-  const { addEntry } = useBrew()
+  const { entries, addEntry } = useBrew()
 
   const [type, setType] = useState('coffee')
   const [name, setName] = useState('')
@@ -17,6 +19,8 @@ export default function AddPage() {
   const [rating, setRating] = useState(0)
   const [notes, setNotes] = useState('')
   const [color, setColor] = useState('#c97b3a')
+  const [location, setLocation] = useState('')
+  const suggestions = useMemo(() => recentLocations(entries), [entries])
 
   function handleSave() {
     if (!name.trim()) return
@@ -26,6 +30,7 @@ export default function AddPage() {
       ...(photo && { photo }),
       ...(rating > 0 && { rating }),
       ...(notes.trim() && { notes: notes.trim() }),
+      ...(location.trim() && { location: location.trim() }),
       color,
     })
     playDrop()
@@ -102,6 +107,13 @@ export default function AddPage() {
             <label className="sheet__label">Rating (optional)</label>
             <StarRating value={rating} onChange={setRating} />
           </div>
+
+          {/* Location */}
+          <LocationField
+            value={location}
+            onChange={setLocation}
+            suggestions={suggestions}
+          />
 
           {/* Notes */}
           <div>
