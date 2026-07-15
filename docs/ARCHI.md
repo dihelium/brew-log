@@ -9,7 +9,7 @@ This is the architectural single source of truth for my-brew-log, read at the st
 my-brew-log is an **offline-first PWA** for logging coffee/matcha/tea intake, designed to be installed on an iPhone home screen. Entries (name, type, rating, notes, photo, extracted color) are stored locally in IndexedDB and synced to Supabase when online. A no-sign-in demo mode uses the same local stack with a synthetic user and seeded entries, but never syncs. A layered "daily cup" visualization, photo streaks, and switchable themes make up the personality of the app.
 
 - **Project type**: Web Frontend (React SPA / PWA) with a Supabase backend-as-a-service
-- **Current version**: 0.3.0 (`package.json`)
+- **Current version**: 0.4.0 (`package.json`)
 - **Deployment**: Vercel (static SPA with rewrite-to-index), service worker for offline
 
 ## 3. Technology Stack
@@ -39,7 +39,7 @@ src/
 │   ├── DetailPage.jsx    # "/entry/:id" — inline per-field editing
 │   ├── CalendarPage.jsx  # "/calendar" — month grid (brew-day dots), day list + day mug
 │   └── LoginPage.jsx     # Google OAuth sign-in
-├── components/           # DailyCup, EntryCard, StarRating, PhotoPicker, ColorPicker, ThemePicker, BackupControls, LocationField, DemoBanner
+├── components/           # DailyCup, EntryCard, StarRating, PhotoPicker, ColorPicker, ThemePicker, BackupControls, LocationField, DemoBanner, SyncErrorChip
 ├── context/
 │   ├── AuthContext.jsx   # Supabase/demo session state, signInWithGoogle/signOut
 │   └── BrewContext.jsx   # Entry CRUD, cache + sync orchestration
@@ -60,7 +60,7 @@ scripts/
 ## 5. Core Architecture Principles
 
 - **Offline-first**: all reads/writes hit IndexedDB first; the UI never blocks on the network.
-- **Outbox pattern**: mutations append `{ seq, op, entry }` to an ordered `outbox` store; `flushOutbox` replays `add`, whitelisted partial `update`, and `delete` operations against Supabase when connectivity/auth allows, while `pullRemote` reconciles remote rows back into the cache. The `update` op carries a canonical patch over a fixed set of editable client fields (`name`, `type`, `rating`, `notes`, `timestamp`, `location`), normalized by `normalizePatch` and mapped symmetrically by `toPatchRow`/`applyPatch` — it never touches photo storage or `photo_path`. Pending update patches are overlaid on pulled rows, and a sync requested during an active pass queues one follow-up pass, so edits made mid-sync are neither reverted nor stranded. A row deleted on another device wins over a local edit (delete-wins): the `update` matches zero rows, the op is dropped, and the next pull prunes the local entry.
+- **Outbox pattern**: mutations append `{ seq, op, entry }` to an ordered `outbox` store; `flushOutbox` replays `add`, whitelisted partial `update`, and `delete` operations against Supabase when connectivity/auth allows, while `pullRemote` reconciles remote rows back into the cache. The `update` op carries a canonical patch over a fixed set of editable client fields (`name`, `type`, `rating`, `notes`, `timestamp`, `location`), normalized by `normalizePatch` and mapped symmetrically by `toPatchRow`/`applyPatch` — it never touches photo storage or `photo_path`. Pending update patches are overlaid on pulled rows, and a sync requested during an active pass queues one follow-up pass, so edits made mid-sync are neither reverted nor stranded. A row deleted on another device wins over a local edit (delete-wins): the `update` matches zero rows, the op is dropped, and the next pull prunes the local entry. Flushes visit ops in `seq` order and skip later ops only for an entry whose earlier op failed, preserving add→update→delete causal order while allowing other entries to proceed; failed ops remain queued and the summary reports `flushed`, blocked-entry `failed`, non-blocking photo `cleanupFailed`, and the first `error`. Photo uploads use `upsert: false` and treat duplicate/409 results as success, while delete cleanup failures do not pin an already-authoritative row delete. Pulls cache rows even when a photo download fails and report a soft `photoFailed` signal.
 - **Per-user isolation**: IndexedDB database name is `brew-log-<userId>`; switching accounts switches databases.
 - **Demo isolation**: demo mode exposes the synthetic user `{ id: 'demo', email: 'demo@brew.log', isDemo: true }`, opens `brew-log-demo`, reseeds its entries/photos on open, and makes `BrewContext.runSync` a no-op. Demo mutations can remain in that cache's outbox, which is cleared on the next reseed and is never flushed to Supabase.
 - **Context over state libraries**: `AuthContext` and `BrewContext` are the only global state; no Redux/Zustand.
@@ -114,8 +114,10 @@ Add-entry path: AddPage → compressImage + extractColor → `addEntry` (BrewCon
 ## 9. Error Handling Strategy
 
 - Missing Supabase env vars log a clear console error instead of failing cryptically.
-- Sync failures leave items in the outbox for retry; the UI keeps working from cache.
+- Sync failures leave items in the outbox for retry; the UI keeps working from cache. `BrewContext` exposes `syncError` and `retrySync`, and real-user feeds show an error-only retry chip when a flush fails, delete photo cleanup fails, a remote query fails, or a photo download is incomplete. A fully clean pass clears the chip; demo mode never syncs or shows it.
 - Entry validation (`isValidEntry`) guards against malformed cached/remote data.
+
+For the July account-consolidation recovery, read the iPhone's displayed account before signing out. If it is the canonical account, flush that account's local outbox; otherwise import the verified backup on a device signed into the canonical account before switching the iPhone. Per-user IndexedDB isolation means switching accounts does not move local entries. Verify the final row count in Supabase rather than relying only on a device cache.
 
 ## 10. Testing Strategy
 

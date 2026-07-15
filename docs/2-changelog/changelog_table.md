@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message                  |
 | ------- | ---- | ------------------------------- |
+| `0.4.0` | 1    | fix: resilient outbox sync, sync-error visibility, and account clarity |
 | `0.3.0` | 1    | feat: no-sign-in demo mode with seeded local brews |
 | `0.2.0` | 1    | feat: editable brew fields (date/rating/notes/name/type), tea type, and calendar view |
 | `0.1.0` | 1    | feat: add per-brew location with inline edit, suggestions, and sync-safe updates |
@@ -10,6 +11,12 @@
 ---
 
 # Changelog Summary
+
+- **v0.4.0 (Sync Resilience & Account Clarity - Week 1, 15-07-2026)**:
+  - **Fix**: resilient `flushOutbox` — a failing outbox op no longer freezes all sync; it blocks only that entry's later ops (preserving causal order) while other entries flush, and failed ops retry next pass. Returns `{ ok, flushed, failed, cleanupFailed, error }`.
+  - **Retry-safety**: idempotent photo upload (`upsert:false`, duplicate/409 = success) so a photo-uploaded-but-row-failed entry retries cleanly (the likely original cause of the stranded iPhone entries).
+  - **Visibility**: `syncError` state + `SyncErrorChip` retry chip; `remove()`/`download()` storage errors surfaced via `cleanupFailed`/`photoFailed`.
+  - **Account clarity**: forced Google account chooser (`prompt: 'select_account'`); "Signed in as \<email\>" in `BackupControls`; `await importEntries` bugfix. 6 new sync tests. No schema/DB/migration changes.
 
 - **v0.3.0 (Demo Mode - Week 1, 15-07-2026)**:
   - **Feature**: No-sign-in demo for reviewers — "Explore the demo" button on LoginPage enters a synthetic local session (`{ id: 'demo', isDemo: true }`, persisted under `localStorage['brewlog:demo']`); a DemoBanner chip exits back to login. A real Google session always wins.

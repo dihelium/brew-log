@@ -24,6 +24,7 @@ export function BrewProvider({ children }) {
 
   const [entries, setEntries] = useState([])
   const [demoSeedError, setDemoSeedError] = useState(false)
+  const [syncError, setSyncError] = useState(false)
   const cacheRef = useRef(null)
   const urlsRef = useRef(new Map())   // entry id -> object URL
   const syncingRef = useRef(false)
@@ -71,13 +72,43 @@ export function BrewProvider({ children }) {
     try {
       do {
         syncQueuedRef.current = false
-        await flushOutbox(supabase, cache, userId)
-        await pullRemote(supabase, cache)
+        let flushResult = null
+        let pullResult = null
+        let passFailed = false
+
+        try {
+          flushResult = await flushOutbox(supabase, cache, userId)
+        } catch {
+          passFailed = true
+        }
+
+        try {
+          pullResult = await pullRemote(supabase, cache)
+        } catch {
+          passFailed = true
+        }
+
+        if (
+          !flushResult ||
+          !pullResult ||
+          !flushResult.ok ||
+          !pullResult.ok ||
+          pullResult.photoFailed
+        ) {
+          passFailed = true
+        }
+        setSyncError(passFailed)
         await hydrate(cache)
       } while (syncQueuedRef.current)
+    } catch {
+      setSyncError(true)
     } finally {
       syncingRef.current = false
     }
+  }
+
+  function retrySync() {
+    return runSync()
   }
 
   // Open the cache and load whenever the signed-in user changes.
@@ -90,6 +121,7 @@ export function BrewProvider({ children }) {
     // entries never flash while the next account's cache loads.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries([])
+    setSyncError(false)
     setDemoSeedError(false)
 
     if (!userId) return
@@ -266,6 +298,8 @@ export function BrewProvider({ children }) {
       importEntries,
       exportEntries,
       demoSeedError,
+      syncError,
+      retrySync,
     }}>
       {children}
     </BrewContext.Provider>

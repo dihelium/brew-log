@@ -5,12 +5,13 @@ import EntryCard from '../components/EntryCard'
 import DailyCup from '../components/DailyCup'
 import BackupControls from '../components/BackupControls'
 import DemoBanner from '../components/DemoBanner'
+import SyncErrorChip from '../components/SyncErrorChip'
 import ThemePicker from '../components/ThemePicker'
 import { useAuth } from '../context/AuthContext'
 import { calcPhotoStreak } from '../utils/streakCalc'
 
 export default function FeedPage() {
-  const { entries, demoSeedError } = useBrew()
+  const { entries, demoSeedError, syncError } = useBrew()
   const { isDemo } = useAuth()
   const navigate = useNavigate()
 
@@ -29,6 +30,7 @@ export default function FeedPage() {
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
       {isDemo && <DemoBanner />}
+      {!isDemo && syncError && <SyncErrorChip />}
 
       <div className="feed-page__heading-row">
         <span aria-hidden="true" />

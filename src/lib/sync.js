@@ -129,15 +129,36 @@ export function applyPatch(entry, patch = {}) {
   return next
 }
 
+function isDuplicateUploadError(error) {
+  const status = Number(error?.statusCode ?? error?.status)
+  const message = [error?.message, error?.error]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return status === 409 || message.includes('already exists') || message.includes('duplicate')
+}
+
 /**
- * flushOutbox — replay queued ops in order. Stops on the first failure and
- * leaves the failing op (and the rest) in the outbox for a later retry.
- * Upserts and update-by-id/deletes keyed by the client UUID are idempotent, so
- * retries are safe.
+ * flushOutbox — replay queued ops in seq order. A failed op blocks only later
+ * ops for the same entry during this pass, so unrelated entries can continue.
+ * Failed ops remain queued for a later retry.
  */
 export async function flushOutbox(supabase, cache, userId) {
   const ops = await cache.allOps()
+  const blockedIds = new Set()
+  let flushed = 0
+  let failed = 0
+  let cleanupFailed = 0
+  let firstError = null
+
+  function recordError(error) {
+    if (!firstError) firstError = error
+  }
+
   for (const item of ops) {
+    const id = item.entry?.id
+    if (blockedIds.has(id)) continue
+
     try {
       if (item.op === 'add') {
         let photoPath = item.entry.photo_path ?? null
@@ -146,8 +167,8 @@ export async function flushOutbox(supabase, cache, userId) {
           photoPath = `${userId}/${item.entry.id}.jpg`
           const { error } = await supabase.storage
             .from(BUCKET)
-            .upload(photoPath, blob, { upsert: true, contentType: 'image/jpeg' })
-          if (error) throw error
+            .upload(photoPath, blob, { upsert: false, contentType: 'image/jpeg' })
+          if (error && !isDuplicateUploadError(error)) throw error
         }
         const { error } = await supabase.from('entries').upsert(toRow(item.entry, userId, photoPath))
         if (error) throw error
@@ -166,15 +187,35 @@ export async function flushOutbox(supabase, cache, userId) {
         const path = item.entry.photo_path
           || (item.entry.hasPhoto ? `${userId}/${item.entry.id}.jpg` : null)
         if (path) {
-          await supabase.storage.from(BUCKET).remove([path])
+          try {
+            const { error: removeError } = await supabase.storage.from(BUCKET).remove([path])
+            if (removeError) {
+              cleanupFailed++
+              recordError(removeError)
+              console.error('Failed to remove brew photo after deleting entry', removeError)
+            }
+          } catch (removeError) {
+            cleanupFailed++
+            recordError(removeError)
+            console.error('Failed to remove brew photo after deleting entry', removeError)
+          }
         }
       }
       await cache.removeOp(item.seq)
+      flushed++
     } catch (error) {
-      return { ok: false, error }
+      blockedIds.add(id)
+      failed++
+      recordError(error)
     }
   }
-  return { ok: true }
+  return {
+    ok: failed === 0 && cleanupFailed === 0,
+    flushed,
+    failed,
+    cleanupFailed,
+    error: firstError,
+  }
 }
 
 /**
@@ -203,6 +244,7 @@ export async function pullRemote(supabase, cache) {
     pendingPatches.set(o.entry.id, { ...pendingPatches.get(o.entry.id), ...o.entry.patch })
   }
   const serverIds = new Set(data.map(r => r.id))
+  let photoFailed = false
 
   // Prune entries that were deleted on another device. Keep un-synced local
   // creates (pending add) so they aren't lost before they reach the server.
@@ -217,9 +259,21 @@ export async function pullRemote(supabase, cache) {
     if (pendingDeletes.has(row.id)) continue
     await cache.putEntry(applyPatch(fromRow(row), pendingPatches.get(row.id)))
     if (row.photo_path && !(await cache.getPhotoBlob(row.id))) {
-      const { data: blob } = await supabase.storage.from(BUCKET).download(row.photo_path)
-      if (blob) await cache.putPhotoBlob(row.id, blob)
+      try {
+        const { data: blob, error: downloadError } = await supabase.storage
+          .from(BUCKET)
+          .download(row.photo_path)
+        if (downloadError) {
+          photoFailed = true
+          console.error('Failed to download brew photo', downloadError)
+        } else if (blob) {
+          await cache.putPhotoBlob(row.id, blob)
+        }
+      } catch (downloadError) {
+        photoFailed = true
+        console.error('Failed to download brew photo', downloadError)
+      }
     }
   }
-  return { ok: true, count: data.length }
+  return { ok: true, count: data.length, photoFailed }
 }

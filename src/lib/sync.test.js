@@ -31,27 +31,57 @@ function memCache() {
   }
 }
 
-function okSupabase(rows = []) {
-  return {
+function okSupabase(rows = [], behavior = {}) {
+  const sb = {
     _uploads: [], _upserts: [], _updates: [], _deletes: [], _removes: [],
-    from() {
+    from: null,
+    storage: { from: null },
+  }
+
+  function errorFor(value, args) {
+    return typeof value === 'function' ? value(...args) : value ?? null
+  }
+
+  sb.from = () => ({
+    upsert: async (row) => {
+      sb._upserts.push(row)
+      return { error: errorFor(behavior.upsertError, [row]) }
+    },
+    update(row) {
       return {
-        upsert: async (row) => { fakeSb._upserts.push(row); return { error: null } },
-        update(row) { return { eq: async (_c, id) => { fakeSb._updates.push({ id, row }); return { error: null } } } },
-        select() { return { order: async () => ({ data: rows, error: null }) } },
-        delete() { return { eq: async (_c, id) => { fakeSb._deletes.push(id); return { error: null } } } },
+        eq: async (_column, id) => {
+          sb._updates.push({ id, row })
+          return { error: errorFor(behavior.updateError, [id, row]) }
+        },
       }
     },
-    storage: {
-      from() {
-        return {
-          upload: async (path, blob) => { fakeSb._uploads.push({ path, blob }); return { error: null } },
-          remove: async (paths) => { fakeSb._removes.push(...paths); return { error: null } },
-          download: async () => ({ data: new Blob(['img'], { type: 'image/jpeg' }), error: null }),
-        }
-      },
+    select() { return { order: async () => ({ data: rows, error: null }) } },
+    delete() {
+      return {
+        eq: async (_column, id) => {
+          sb._deletes.push(id)
+          return { error: errorFor(behavior.deleteError, [id]) }
+        },
+      }
     },
-  }
+  })
+
+  sb.storage.from = () => ({
+    upload: async (path, blob, options) => {
+      sb._uploads.push({ path, blob, options })
+      return { error: errorFor(behavior.uploadError, [path, blob, options, sb._uploads.length]) }
+    },
+    remove: async (paths) => {
+      sb._removes.push(...paths)
+      return { error: errorFor(behavior.removeError, [paths]) }
+    },
+    download: async (path) => ({
+      data: behavior.downloadError ? null : new Blob(['img'], { type: 'image/jpeg' }),
+      error: errorFor(behavior.downloadError, [path]),
+    }),
+  })
+
+  return sb
 }
 let fakeSb
 
@@ -181,6 +211,7 @@ describe('flushOutbox', () => {
     const res = await flushOutbox(fakeSb, c, 'u1')
     expect(res.ok).toBe(true)
     expect(fakeSb._uploads).toHaveLength(1)
+    expect(fakeSb._uploads[0].options).toMatchObject({ upsert: false })
     expect(fakeSb._upserts[0]).toMatchObject({ id: 'a', photo_path: 'u1/a.jpg' })
     expect(await c.allOps()).toHaveLength(0)
   })
@@ -192,7 +223,79 @@ describe('flushOutbox', () => {
     await c.enqueue('add', { id: 'a', name: 'X', timestamp: 1, hasPhoto: false })
     const res = await flushOutbox(fakeSb, c, 'u1')
     expect(res.ok).toBe(false)
+    expect(res).toMatchObject({ flushed: 0, failed: 1, cleanupFailed: 0 })
     expect(await c.allOps()).toHaveLength(1)
+  })
+
+  it('continues with another entry when one entry fails', async () => {
+    fakeSb = okSupabase([], {
+      updateError: (id) => id === 'a' ? { message: 'A failed' } : null,
+    })
+    const c = memCache()
+    await c.enqueue('update', { id: 'a', patch: { name: 'A' } })
+    await c.enqueue('update', { id: 'b', patch: { name: 'B' } })
+
+    const res = await flushOutbox(fakeSb, c, 'u1')
+
+    expect(res).toMatchObject({ ok: false, flushed: 1, failed: 1, cleanupFailed: 0 })
+    expect(fakeSb._updates.map(update => update.id)).toEqual(['a', 'b'])
+    expect((await c.allOps()).map(op => op.entry.id)).toEqual(['a'])
+  })
+
+  it('blocks later operations for a failed entry while flushing another entry', async () => {
+    fakeSb = okSupabase([], {
+      upsertError: (row) => row.id === 'a' ? { message: 'A failed' } : null,
+    })
+    const c = memCache()
+    await c.enqueue('add', { id: 'a', name: 'A', timestamp: 1, hasPhoto: false })
+    await c.enqueue('update', { id: 'a', patch: { name: 'A updated' } })
+    await c.enqueue('add', { id: 'b', name: 'B', timestamp: 2, hasPhoto: false })
+
+    const res = await flushOutbox(fakeSb, c, 'u1')
+
+    expect(res).toMatchObject({ ok: false, flushed: 1, failed: 1, cleanupFailed: 0 })
+    expect(fakeSb._upserts.map(row => row.id)).toEqual(['a', 'b'])
+    expect(fakeSb._updates).toHaveLength(0)
+    expect((await c.allOps()).map(op => op.entry.id)).toEqual(['a', 'a'])
+  })
+
+  it('flushes every operation and returns a clean summary when all succeed', async () => {
+    fakeSb = okSupabase()
+    const c = memCache()
+    await c.enqueue('add', { id: 'a', name: 'A', timestamp: 1, hasPhoto: false })
+    await c.enqueue('update', { id: 'a', patch: { name: 'A updated' } })
+    await c.enqueue('delete', { id: 'b', photo_path: null, hasPhoto: false })
+
+    const res = await flushOutbox(fakeSb, c, 'u1')
+
+    expect(res).toEqual({ ok: true, flushed: 3, failed: 0, cleanupFailed: 0, error: null })
+    expect(await c.allOps()).toHaveLength(0)
+  })
+
+  it('retries an add safely after upload success and row failure', async () => {
+    let upsertCalls = 0
+    fakeSb = okSupabase([], {
+      uploadError: (_path, _blob, _options, call) => call === 1
+        ? null
+        : { statusCode: 409, message: 'The resource already exists' },
+      upsertError: () => {
+        upsertCalls++
+        return upsertCalls === 1 ? { message: 'row failed' } : null
+      },
+    })
+    const c = memCache()
+    await c.putPhotoBlob('a', new Blob(['x'], { type: 'image/jpeg' }))
+    await c.enqueue('add', { id: 'a', name: 'A', timestamp: 1, hasPhoto: true })
+
+    const first = await flushOutbox(fakeSb, c, 'u1')
+    const second = await flushOutbox(fakeSb, c, 'u1')
+
+    expect(first).toMatchObject({ ok: false, failed: 1 })
+    expect(second).toEqual({ ok: true, flushed: 1, failed: 0, cleanupFailed: 0, error: null })
+    expect(fakeSb._uploads[0].options).toMatchObject({ upsert: false })
+    expect(fakeSb._uploads).toHaveLength(2)
+    expect(fakeSb._upserts).toHaveLength(2)
+    expect(await c.allOps()).toHaveLength(0)
   })
 
   it('replays an update as a partial row update without touching storage', async () => {
@@ -250,6 +353,20 @@ describe('flushOutbox', () => {
     await flushOutbox(fakeSb, c, 'u1')
     expect(fakeSb._removes).toHaveLength(0)
   })
+
+  it('removes a delete op even when photo cleanup fails and reports the cleanup', async () => {
+    fakeSb = okSupabase([], {
+      removeError: { status: 500, message: 'storage unavailable' },
+    })
+    const c = memCache()
+    await c.enqueue('delete', { id: 'a', photo_path: 'u1/a.jpg', hasPhoto: true })
+
+    const res = await flushOutbox(fakeSb, c, 'u1')
+
+    expect(res).toMatchObject({ ok: false, flushed: 1, failed: 0, cleanupFailed: 1 })
+    expect(res.error).toMatchObject({ message: 'storage unavailable' })
+    expect(await c.allOps()).toHaveLength(0)
+  })
 })
 
 describe('pullRemote', () => {
@@ -262,6 +379,21 @@ describe('pullRemote', () => {
     expect(res.ok).toBe(true)
     expect(await c.getEntry('a')).toMatchObject({ id: 'a', hasPhoto: true })
     expect(await c.getPhotoBlob('a')).toBeInstanceOf(Blob)
+  })
+
+  it('caches the row and reports a soft failure when a photo download fails', async () => {
+    fakeSb = okSupabase([
+      { id: 'a', name: 'X', logged_at: new Date(1).toISOString(), photo_path: 'u1/a.jpg' },
+    ], {
+      downloadError: { status: 500, message: 'download failed' },
+    })
+    const c = memCache()
+
+    const res = await pullRemote(fakeSb, c)
+
+    expect(res).toMatchObject({ ok: true, count: 1, photoFailed: true })
+    expect(await c.getEntry('a')).toMatchObject({ id: 'a', hasPhoto: true })
+    expect(await c.getPhotoBlob('a')).toBeUndefined()
   })
 
   it('skips rows pending local deletion', async () => {

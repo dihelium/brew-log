@@ -17,7 +17,7 @@ const btnStyle = {
 
 export default function BackupControls() {
   const { entries, importEntries, exportEntries } = useBrew()
-  const { signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const fileRef = useRef(null)
   const [status, setStatus] = useState('')
 
@@ -57,7 +57,7 @@ export default function BackupControls() {
     try {
       const text = await file.text()
       const raw = JSON.parse(text)
-      const { added, valid } = importEntries(raw)
+      const { added, valid } = await importEntries(raw)
       if (valid === 0) {
         setStatus('No valid brews found in that file.')
       } else if (added === 0) {
@@ -116,6 +116,18 @@ export default function BackupControls() {
           textAlign: 'center',
         }}>
           {status}
+        </p>
+      )}
+
+      {user && !user.isDemo && (
+        <p style={{
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+          fontFamily: 'var(--font-body)',
+          marginTop: 16,
+          textAlign: 'center',
+        }}>
+          Signed in as {user.email}
         </p>
       )}
 
