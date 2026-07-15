@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
-  const { signInWithGoogle } = useAuth()
+  const { signInWithGoogle, enterDemo } = useAuth()
   const [error, setError] = useState('')
 
   async function handleSignIn() {
@@ -44,6 +44,23 @@ export default function LoginPage() {
         }}
       >
         Continue with Google
+      </button>
+      <button
+        type="button"
+        onClick={enterDemo}
+        style={{
+          minHeight: 44,
+          padding: '10px 16px',
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border)',
+          background: 'var(--surface)',
+          color: 'var(--text-muted)',
+          fontSize: 14,
+          fontFamily: 'var(--font-body)',
+          cursor: 'pointer',
+        }}
+      >
+        Explore the demo — no sign-in needed
       </button>
       {error && (
         <p style={{ color: 'var(--accent-coffee)', fontSize: 13, fontFamily: 'var(--font-body)' }}>

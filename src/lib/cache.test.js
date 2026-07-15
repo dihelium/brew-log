@@ -38,4 +38,17 @@ describe('cache', () => {
     await a.putEntry({ id: 'x', name: 'A', timestamp: 1 })
     expect(await b.allEntries()).toHaveLength(0)
   })
+
+  it('clear() empties entries, photos, and outbox', async () => {
+    const c = await createCache('user-clear')
+    await c.putEntry({ id: 'a', name: 'A', timestamp: 1 })
+    await c.putPhotoBlob('a', new Blob(['x'], { type: 'image/jpeg' }))
+    await c.enqueue('add', { id: 'a' })
+
+    await c.clear()
+
+    expect(await c.allEntries()).toHaveLength(0)
+    expect(await c.getPhotoBlob('a')).toBeUndefined()
+    expect(await c.allOps()).toHaveLength(0)
+  })
 })

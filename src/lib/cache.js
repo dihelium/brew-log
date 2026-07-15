@@ -29,5 +29,11 @@ export async function createCache(userId) {
     enqueue: (op, entry) => db.add('outbox', { op, entry }),
     allOps: () => db.getAll('outbox'),       // returned in 'seq' key order
     removeOp: (seq) => db.delete('outbox', seq),
+
+    clear: async () => {
+      await db.clear('entries')
+      await db.clear('photos')
+      await db.clear('outbox')
+    },
   }
 }

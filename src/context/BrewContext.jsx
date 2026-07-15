@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { supabase } from '../lib/supabase'
 import { createCache } from '../lib/cache'
+import { seedDemoCache } from '../lib/demo'
 import { dataUrlToBlob, blobToDataUrl } from '../lib/photoCodec'
 import { applyPatch, flushOutbox, normalizePatch, pullRemote } from '../lib/sync'
 
@@ -18,10 +19,11 @@ function isValidEntry(e) {
 }
 
 export function BrewProvider({ children }) {
-  const { user } = useAuth()
+  const { user, isDemo } = useAuth()
   const userId = user?.id ?? null
 
   const [entries, setEntries] = useState([])
+  const [demoSeedError, setDemoSeedError] = useState(false)
   const cacheRef = useRef(null)
   const urlsRef = useRef(new Map())   // entry id -> object URL
   const syncingRef = useRef(false)
@@ -58,7 +60,7 @@ export function BrewProvider({ children }) {
 
   async function runSync() {
     const cache = cacheRef.current
-    if (!cache || !userId) return
+    if (!cache || !userId || isDemo) return
     // A call during an active pass queues one follow-up pass, so a mutation
     // enqueued after flushOutbox snapshotted the outbox still syncs promptly.
     if (syncingRef.current) {
@@ -88,16 +90,30 @@ export function BrewProvider({ children }) {
     // entries never flash while the next account's cache loads.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries([])
+    setDemoSeedError(false)
 
     if (!userId) return
     createCache(userId).then(async cache => {
       if (cancelled) return
       cacheRef.current = cache
+
+      if (isDemo && userId === 'demo') {
+        try {
+          await seedDemoCache(cache, Date.now())
+        } catch {
+          if (!cancelled) setDemoSeedError(true)
+          return
+        }
+        if (cancelled) return
+        await hydrate(cache)
+        return
+      }
+
       await hydrate(cache)
       runSync()
     })
     return () => { cancelled = true }
-  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, isDemo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-sync on reconnect and tab focus.
   useEffect(() => {
@@ -242,7 +258,15 @@ export function BrewProvider({ children }) {
   }
 
   return (
-    <BrewContext.Provider value={{ entries, addEntry, updateEntry, deleteEntry, importEntries, exportEntries }}>
+    <BrewContext.Provider value={{
+      entries,
+      addEntry,
+      updateEntry,
+      deleteEntry,
+      importEntries,
+      exportEntries,
+      demoSeedError,
+    }}>
       {children}
     </BrewContext.Provider>
   )
