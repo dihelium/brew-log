@@ -3,10 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useBrew } from '../context/BrewContext'
 import StarRating from '../components/StarRating'
+import ColorPicker from '../components/ColorPicker'
 import LocationField from '../components/LocationField'
 import { recentLocations } from '../utils/recentLocations'
 import { BREW_TYPES, brewTypeLabel } from '../utils/brewTypes'
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '../utils/datetimeLocal'
+
+const DEFAULT_COLOR = '#c97b3a'
 
 function formatDate(ts) {
   return new Date(ts).toLocaleString([], {
@@ -56,6 +59,7 @@ export default function DetailPage() {
   const [ratingDraft, setRatingDraft] = useState(0)
   const [notesDraft, setNotesDraft] = useState('')
   const [locationDraft, setLocationDraft] = useState('')
+  const [colorDraft, setColorDraft] = useState(DEFAULT_COLOR)
   const suggestions = useMemo(() => recentLocations(entries), [entries])
 
   const entry = entries.find(e => e.id === id)
@@ -137,6 +141,16 @@ export default function DetailPage() {
 
   async function handleLocationSave() {
     await updateEntry(id, { location: locationDraft })
+    setEditingField(null)
+  }
+
+  function beginColorEdit() {
+    setColorDraft(entry.color || DEFAULT_COLOR)
+    setEditingField('color')
+  }
+
+  async function handleColorSave() {
+    await updateEntry(id, { color: colorDraft })
     setEditingField(null)
   }
 
@@ -297,6 +311,44 @@ export default function DetailPage() {
             aria-label={entry.rating > 0 ? 'Edit rating' : 'Add rating'}
           >
             {entry.rating > 0 ? <StarRating value={entry.rating} readOnly /> : 'Add rating'}
+          </div>
+        )}
+
+        {editingField === 'color' ? (
+          <div className="detail-edit-row">
+            <ColorPicker
+              photoDataUrl={entry.photo}
+              color={colorDraft}
+              onChange={setColorDraft}
+              autoExtract={false}
+            />
+            <EditActions
+              onSave={handleColorSave}
+              onCancel={() => setEditingField(null)}
+            />
+          </div>
+        ) : entry.photo ? (
+          <button
+            type="button"
+            className="detail-color-row"
+            onClick={beginColorEdit}
+            aria-label="Edit drink colour"
+          >
+            <span
+              className="detail-color-row__swatch"
+              style={{ background: entry.color || DEFAULT_COLOR }}
+              aria-hidden="true"
+            />
+            <span>Drink colour</span>
+          </button>
+        ) : (
+          <div className="detail-color-row" data-interactive="false">
+            <span
+              className="detail-color-row__swatch"
+              style={{ background: entry.color || DEFAULT_COLOR }}
+              aria-hidden="true"
+            />
+            <span>Drink colour</span>
           </div>
         )}
 

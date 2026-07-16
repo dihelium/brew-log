@@ -118,6 +118,11 @@ describe('toPatchRow', () => {
     expect(toPatchRow({ location: null })).toEqual({ location: null })
   })
 
+  it('maps color only when the patch includes it', () => {
+    expect(toPatchRow({ color: '#a1B2c3' })).toEqual({ color: '#a1B2c3' })
+    expect(toPatchRow({ name: 'Tea' })).toEqual({ name: 'Tea' })
+  })
+
   it('ignores unknown keys', () => {
     expect(toPatchRow({ photo_path: 'x' })).toEqual({})
     expect(toPatchRow()).toEqual({})
@@ -130,6 +135,7 @@ describe('toPatchRow', () => {
       rating: 5,
       notes: 'bright',
       location: 'office',
+      color: '#a1b2c3',
       timestamp: 1000,
     })).toEqual({
       name: 'Tea',
@@ -137,6 +143,7 @@ describe('toPatchRow', () => {
       rating: 5,
       notes: 'bright',
       location: 'office',
+      color: '#a1b2c3',
       logged_at: new Date(1000).toISOString(),
     })
   })
@@ -179,6 +186,14 @@ describe('normalizePatch', () => {
     expect(normalizePatch({ name: null })).toEqual({})
     expect(normalizePatch({ rating: '0' })).toEqual({ rating: null })
   })
+
+  it('accepts trimmed six-digit hex colors and drops invalid values', () => {
+    expect(normalizePatch({ color: '  #a1B2c3  ' })).toEqual({ color: '#a1B2c3' })
+    expect(normalizePatch({ color: 'red' })).toEqual({})
+    expect(normalizePatch({ color: '#12345' })).toEqual({})
+    expect(normalizePatch({ color: '#1234567' })).toEqual({})
+    expect(normalizePatch({ color: '' })).toEqual({})
+  })
 })
 
 describe('applyPatch', () => {
@@ -198,6 +213,14 @@ describe('applyPatch', () => {
     })).toEqual({ id: 'a', name: 'New', type: 'tea', rating: 5, notes: 'new', timestamp: 2 })
     expect(applyPatch(entry, { type: null, rating: null, notes: null })).toEqual({
       id: 'a', name: 'Old', type: null, location: 'home', timestamp: 1,
+    })
+  })
+
+  it('applies a normalized color patch without changing other fields', () => {
+    const entry = { id: 'a', name: 'Tea', timestamp: 1, color: '#112233' }
+    const patch = normalizePatch({ color: '  #A1b2C3  ' })
+    expect(applyPatch(entry, patch)).toEqual({
+      id: 'a', name: 'Tea', timestamp: 1, color: '#A1b2C3',
     })
   })
 })

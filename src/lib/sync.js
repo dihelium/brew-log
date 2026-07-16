@@ -66,6 +66,10 @@ export function normalizePatch(patch = {}) {
     const location = typeof patch.location === 'string' ? patch.location.trim() : ''
     normalized.location = location || null
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'color')) {
+    const color = String(patch.color ?? '').trim()
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) normalized.color = color
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'timestamp') && Number.isFinite(patch.timestamp)) {
     normalized.timestamp = patch.timestamp
   }
@@ -92,6 +96,9 @@ export function toPatchRow(patch = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
     row.location = patch.location || null
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'color')) {
+    row.color = patch.color
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'timestamp')) {
     row.logged_at = new Date(patch.timestamp).toISOString()
@@ -122,6 +129,9 @@ export function applyPatch(entry, patch = {}) {
   if (Object.prototype.hasOwnProperty.call(patch, 'location')) {
     if (patch.location) next.location = patch.location
     else delete next.location
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'color')) {
+    next.color = patch.color
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'timestamp')) {
     next.timestamp = patch.timestamp

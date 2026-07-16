@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { extractDominantColor, buildPickerCanvas, sampleCanvasAt } from '../utils/extractColor'
 
-export default function ColorPicker({ photoDataUrl, color, onChange }) {
+export default function ColorPicker({ photoDataUrl, color, onChange, autoExtract = true }) {
   const [picking, setPicking] = useState(false)
   const [magnifier, setMagnifier] = useState(null)
   const pickerRef = useRef(null)
@@ -9,9 +9,9 @@ export default function ColorPicker({ photoDataUrl, color, onChange }) {
   const ctxRef = useRef(null)
 
   useEffect(() => {
-    if (!photoDataUrl) return
+    if (!photoDataUrl || !autoExtract) return
     extractDominantColor(photoDataUrl).then(onChange)
-  }, [photoDataUrl])
+  }, [photoDataUrl, autoExtract, onChange])
 
   async function startPicking() {
     const result = await buildPickerCanvas(photoDataUrl)

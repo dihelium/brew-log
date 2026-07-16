@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message                  |
 | ------- | ---- | ------------------------------- |
+| `0.5.0` | 1    | feat: editable drink colour on the Detail page for previously logged brews |
 | `0.4.1` | 1    | fix: service worker no longer caches Supabase reads (stale-data bug) |
 | `0.4.0` | 1    | fix: resilient outbox sync, sync-error visibility, and account clarity |
 | `0.3.0` | 1    | feat: no-sign-in demo mode with seeded local brews |
@@ -12,6 +13,12 @@
 ---
 
 # Changelog Summary
+
+- **v0.5.0 (Detail-Page Colour Picker - Week 1, 16-07-2026)**:
+  - **Feature**: `ColorPicker` is now reusable on `DetailPage` — any already-logged brew with a photo (including seeded demo brews) can have its drink colour re-picked after the fact. New `autoExtract` prop (`false` on Detail) stops the picker from auto-overwriting a saved colour on mount; the user must explicitly sample a new pixel via "Pick from photo".
+  - **Sync**: `color` joins the canonical `update` outbox patch, hex-validated and symmetric across `normalizePatch`/`toPatchRow`/`applyPatch`. No Supabase migration (column already existed).
+  - **UI**: New "Drink colour" row on `DetailPage` (display swatch + edit state), theme-variable-only styles; photoless entries show a read-only swatch. Verified across all five themes.
+  - **Tests**: New `color` cases in `sync.test.js` (hex validation, mapping, round-trip). Manual demo-mode walkthrough confirms in-session persistence and expected reset-on-reload (demo reseed gate).
 
 - **v0.4.1 (SW Stop Caching Supabase Reads - Week 1, 16-07-2026)**:
   - **Fix**: the service worker (`public/sw.js`) cache-first strategy was caching the cross-origin Supabase entries API response, serving a stale row set indefinitely — so devices never saw new server data (writes are POST/PATCH and passed through). Now the SW bypasses its cache for `*.supabase.co` (always network); same-origin assets and Google Fonts stay cached. `CACHE_NAME` → `brew-log-v2` purges the poison.
