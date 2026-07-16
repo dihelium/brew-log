@@ -3,9 +3,11 @@ import { resolve } from 'node:path'
 
 const [, , backupPath] = process.argv
 
+// Both coffee sources carry the app's coffee fallback (#c97b3a), which makes the
+// two demo brews indistinguishable; `color` overrides that per brew.
 const selections = [
-  { sourceIndex: 0, id: 'demo-brew-0', type: 'coffee' },
-  { sourceIndex: 1, id: 'demo-brew-1', type: 'coffee' },
+  { sourceIndex: 0, id: 'demo-brew-0', type: 'coffee', color: '#d9772b' },
+  { sourceIndex: 1, id: 'demo-brew-1', type: 'coffee', color: '#c99a6c' },
   { sourceIndex: 7, id: 'demo-brew-2', type: 'matcha' },
 ]
 
@@ -25,7 +27,7 @@ async function main() {
     throw new Error('Backup JSON must contain an array of entries')
   }
 
-  const specs = selections.map(({ sourceIndex, id, type }) => {
+  const specs = selections.map(({ sourceIndex, id, type, color }) => {
     const source = backup[sourceIndex]
     if (!source || typeof source.photo !== 'string') {
       throw new Error(`Backup entry at index ${sourceIndex} is missing a photo`) 
@@ -35,7 +37,7 @@ async function main() {
       id,
       type,
       name: source.name,
-      color: source.color ?? null,
+      color: color ?? source.color ?? null,
       rating: source.rating ?? null,
       photo: source.photo,
     }

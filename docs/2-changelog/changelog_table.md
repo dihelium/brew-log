@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message                  |
 | ------- | ---- | ------------------------------- |
+| `0.5.1` | 1    | fix: distinct default colours for the demo latte and cappuccino |
 | `0.5.0` | 1    | feat: editable drink colour on the Detail page for previously logged brews |
 | `0.4.1` | 1    | fix: service worker no longer caches Supabase reads (stale-data bug) |
 | `0.4.0` | 1    | fix: resilient outbox sync, sync-error visibility, and account clarity |
@@ -13,6 +14,10 @@
 ---
 
 # Changelog Summary
+
+- **v0.5.1 (Distinct Demo Brew Colours - Week 1, 16-07-2026)**:
+  - **Fix**: the two seeded demo coffees (Orange Spiced Cappuccino, Vanilla Latte) both rendered with `#c97b3a` — the coffee accent fallback (`src/index.css:32`) — because their backup source entries had no custom colour. The cappuccino is now a warmer orange (`#d9772b`) and the latte a lighter beige (`#c99a6c`).
+  - **How**: added an optional per-brew `color` override to the demo-data generator (`scripts/extract-demo-photos.mjs`) and regenerated `src/lib/demoData.js` (only the two colour lines changed; photos byte-identical). Demo-seed-only; no schema/sync/component changes.
 
 - **v0.5.0 (Detail-Page Colour Picker - Week 1, 16-07-2026)**:
   - **Feature**: `ColorPicker` is now reusable on `DetailPage` — any already-logged brew with a photo (including seeded demo brews) can have its drink colour re-picked after the fact. New `autoExtract` prop (`false` on Detail) stops the picker from auto-overwriting a saved colour on mount; the user must explicitly sample a new pixel via "Pick from photo".
